@@ -1,4 +1,7 @@
+use crate::windows::*;
+
 use winapi::ctypes::c_int;
+use winapi::shared::minwindef::*;
 use winapi::um::winuser::*;
 
 use std::ptr::null_mut;
@@ -26,4 +29,28 @@ pub fn message_loop_until_wm_quit() -> c_int {
 /// [`PostQuitMessage`](https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-postquitmessage), but safe.
 pub fn post_quit_message(exit_code: c_int) {
     unsafe { PostQuitMessage(exit_code) }
+}
+
+
+
+#[allow(non_snake_case)] pub(crate) fn MAKEINTATOMW(atom: ATOM) -> *const u16 {
+    atom as usize as *const _
+}
+
+
+
+#[test] fn message_loop_test_1() {
+    const CODE : i32 = -9001;
+    assert_eq!(CODE, std::thread::spawn(|| {
+        post_quit_message(CODE);
+        message_loop_until_wm_quit()
+    }).join().unwrap());
+}
+
+#[test] fn message_loop_test_2() {
+    const CODE : i32 = 42;
+    assert_eq!(CODE, std::thread::spawn(|| {
+        post_quit_message(CODE);
+        message_loop_until_wm_quit()
+    }).join().unwrap());
 }

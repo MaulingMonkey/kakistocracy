@@ -14,12 +14,28 @@ description     = "A pile of vaguely gamedev related code, governed by its least
 # categories      = []
 exclude         = [".vscode"]
 
+
+
 [package.metadata.docs.rs]
 all-features    = true
+
+[dependencies]
+lazy_static     = "1.4"
+void            = "1"
+
+[target.'cfg(windows)'.dependencies]
+wchar           = "0.6" # TODO: replace with abistr 0.2
 
 [target.'cfg(windows)'.dependencies.winapi]
 version         = "0.3.9"
 features = [
+    # shared
+    "minwindef",
+    "windef",
+    "winerror",
+
     # um
+    "errhandlingapi",
+    "libloaderapi",
     "winuser",
 ]
