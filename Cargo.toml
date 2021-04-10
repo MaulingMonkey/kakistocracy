@@ -1,0 +1,25 @@
+# https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[package]
+name            = "kakistocracy"
+version         = "0.0.0-git"
+authors         = ["MaulingMonkey <git@maulingmonkey.com>"]
+edition         = "2018"
+repository      = "https://github.com/MaulingMonkey/kakistocracy"
+documentation   = "https://docs.rs/kakistocracy"
+license         = "Apache-2.0 OR MIT"
+readme          = "Readme.md"
+description     = "A pile of vaguely gamedev related code, governed by its least suitable and/or most unscrupulous programmers."
+# keywords        = []
+# categories      = []
+exclude         = [".vscode"]
+
+[package.metadata.docs.rs]
+all-features    = true
+
+[target.'cfg(windows)'.dependencies.winapi]
+version         = "0.3.9"
+features = [
+    # um
+    "winuser",
+]
