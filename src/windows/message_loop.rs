@@ -1,9 +1,14 @@
 use crate::windows::*;
 
+use futures::Future;
+use futures::executor::*;
+use futures::task::*;
+
 use winapi::ctypes::c_int;
 use winapi::shared::minwindef::*;
 use winapi::um::winuser::*;
 
+use std::cell::RefCell;
 use std::ptr::null_mut;
 
 
@@ -22,7 +27,13 @@ pub fn message_loop_until_wm_quit() -> c_int {
             unsafe { TranslateMessage(&msg) }; // generate WM_CHAR, WM_DEADCHAR, WM_UNICHAR, etc.
             unsafe { DispatchMessageW(&msg) }; // invoke WndProcs
         }
-        // TODO: on thread idle processing
+        // TODO: rendering & per-frame tasks
+        LOCAL_POOL.with(|lp| {
+            if let Ok(mut pool) = lp.try_borrow_mut() {
+                pool.run_until_stalled();
+            }
+            // else we're recursively running a message loop within a task? probably an incredibly bad idea, but don't crash
+        });
     }
 }
 
@@ -31,10 +42,20 @@ pub fn post_quit_message(exit_code: c_int) {
     unsafe { PostQuitMessage(exit_code) }
 }
 
+/// Run a future/task in the main message loop
+pub fn spawn_local<F: Future<Output = ()> + 'static>(f: F) -> Result<(), SpawnError> {
+    LOCAL_SPAWNER.with(|ls| ls.spawn_local(f))
+}
+
 
 
 #[allow(non_snake_case)] pub(crate) fn MAKEINTATOMW(atom: ATOM) -> *const u16 {
     atom as usize as *const _
+}
+
+thread_local! {
+    static LOCAL_POOL : RefCell<LocalPool> = Default::default();
+    static LOCAL_SPAWNER : LocalSpawner = LOCAL_POOL.with(|lp| lp.borrow().spawner());
 }
 
 

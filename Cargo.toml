@@ -24,6 +24,7 @@ d3d9            = ["winapi/d3d9", "winapi/d3d9caps", "winapi/d3d9types"]
 all-features    = true
 
 [dependencies]
+futures         = { version = "0.3", features = ["executor"] }
 lazy_static     = "1.4"
 void            = "1"
 
