@@ -14,6 +14,10 @@ description     = "A pile of vaguely gamedev related code, governed by its least
 # categories      = []
 exclude         = [".vscode"]
 
+[features]
+default         = ["d3d9"]
+d3d9            = ["winapi/d3d9", "winapi/d3d9caps", "winapi/d3d9types"]
+
 
 
 [package.metadata.docs.rs]
@@ -24,6 +28,7 @@ lazy_static     = "1.4"
 void            = "1"
 
 [target.'cfg(windows)'.dependencies]
+mcom            = "0.1"
 wchar           = "0.6" # TODO: replace with abistr 0.2
 
 [target.'cfg(windows)'.dependencies.winapi]
