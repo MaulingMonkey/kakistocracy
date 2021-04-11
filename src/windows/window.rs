@@ -66,20 +66,20 @@ impl Window {
 /// Private methods
 impl Window {
     pub(crate) fn find(hwnd: HWND) -> Self {
-        let alive = WINDOWS.with(|w| w.borrow().get(&hwnd).expect("Window::find: HWND not registered, does the wndproc properly (un)register in WM_CREATE/WM_DESTROY?").clone());
+        let alive = WINDOWS.with(|w| w.borrow().get(&hwnd).expect("Window::find: HWND not registered, does the wndproc properly call on_create/on_destroy in WM_CREATE/WM_DESTROY?").clone());
         Self { hwnd, alive }
     }
 
-    pub(crate) fn register(hwnd: HWND) -> Self {
+    pub(crate) fn on_create(hwnd: HWND) -> Self {
         let alive = AliveHandle::new(Cell::new(true));
         let prev = WINDOWS.with(|w| w.borrow_mut().insert(hwnd, alive.clone()));
-        assert!(prev.is_none(), "Window::register: HWND was previously registered");
+        assert!(prev.is_none(), "Window::on_create: HWND was previously registered");
         Self { hwnd, alive }
     }
 
-    pub(crate) fn unregister(hwnd: HWND) {
+    pub(crate) fn on_destroy(hwnd: HWND) {
         let e = WINDOWS.with(|w| w.borrow_mut().remove(&hwnd));
-        let e = e.expect("Window::unregister: HWND was not registered");
+        let e = e.expect("Window::on_destroy: HWND was not registered");
         e.set(false); // window is no longer alive
     }
 
@@ -130,8 +130,8 @@ lazy_static::lazy_static! {
 
 unsafe extern "system" fn stub_window_proc(hwnd: HWND, msg: DWORD, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match msg {
-        WM_CREATE   => drop(Window::register(hwnd)),
-        WM_DESTROY  => drop(Window::unregister(hwnd)),
+        WM_CREATE   => drop(Window::on_create(hwnd)),
+        WM_DESTROY  => drop(Window::on_destroy(hwnd)),
         _other      => {},
     }
     DefWindowProcW(hwnd, msg, wparam, lparam)
