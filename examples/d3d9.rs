@@ -5,11 +5,7 @@
 #[cfg(windows)] fn main() {
     use kakistocracy::windows::*;
 
-    let stub    = Window::create_stub("");
+    let stub    = OwnedWindow::create_stub("");
     let d3d     = d3d9::create_d3d(cfg!(debug_features)).unwrap();
-    let device  = unsafe { d3d9::create_device_windowed(&d3d, &stub) }.unwrap();
-
-    drop(device);
-    drop(d3d);
-    stub.destroy().unwrap();
+    let _device = unsafe { d3d9::create_device_windowed(&d3d, &stub) }.unwrap();
 }

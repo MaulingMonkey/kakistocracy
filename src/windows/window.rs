@@ -12,6 +12,7 @@ use std::collections::HashMap;
 use std::ffi::c_void;
 use std::fmt::{self, Debug, Formatter};
 use std::hash::{Hash, Hasher};
+use std::ops::{Deref, DerefMut};
 use std::ptr::null_mut;
 use std::rc::Rc;
 
@@ -28,19 +29,7 @@ pub struct Window {
 
 /// Construction methods
 impl Window {
-    /// Create an invisible, un-enumerated, 1x1 [Message-Only](https://docs.microsoft.com/en-us/windows/win32/winmsg/window-features#message-only-windows) window, that doesn't process any messages.
-    pub fn create_stub(title: &str) -> Window {
-        let hwnd = unsafe { CreateWindowExW(
-            0,
-            MAKEINTATOMW(*KAKISTOCRACY_STUB_WNDCLASS),
-            title.encode_utf16().chain(Some(0)).collect::<Vec<_>>().as_ptr(),
-            WS_POPUP,
-            CW_USEDEFAULT, CW_USEDEFAULT, 1, 1,
-            HWND_MESSAGE, null_mut(), get_module_handle_exe(), null_mut()
-        )};
-        assert!(!hwnd.is_null(), "Unable to create message-only HWND");
-        Window::find(hwnd)
-    }
+    pub fn null() -> Window { Window { hwnd: null_mut(), alive: Rc::new(Cell::new(false)) } }
 }
 
 /// Public methods
@@ -52,7 +41,10 @@ impl Window {
     pub fn hwnd(&self) -> Option<HWND> { self.alive.get().then(|| self.hwnd) }
 
     /// [`DestroyWindow`](https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-destroywindow)
-    pub fn destroy(self) -> Result<(), Error> {
+    pub fn destroy(self) -> Result<(), Error> { self.destroy_ref() }
+
+    /// [`DestroyWindow`](https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-destroywindow)
+    pub fn destroy_ref(&self) -> Result<(), Error> {
         if !self.alive.get() {
             Err(Error::new("Window::destroy", "", 0, "window already destroyed"))
         } else if unsafe { DestroyWindow(self.hwnd) } != FALSE {
@@ -107,6 +99,54 @@ impl Hash       for Window { fn hash<H: Hasher>(&self, state: &mut H) { self.cmp
 
 
 
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct OwnedWindow(Window);
+
+/// Construction methods
+impl OwnedWindow {
+    /// Create an invisible, un-enumerated, 1x1 [Message-Only](https://docs.microsoft.com/en-us/windows/win32/winmsg/window-features#message-only-windows) window, that doesn't process any messages.
+    pub fn create_stub(title: &str) -> OwnedWindow {
+        let hwnd = unsafe { CreateWindowExW(
+            0,
+            MAKEINTATOMW(*KAKISTOCRACY_STUB_WNDCLASS),
+            title.encode_utf16().chain(Some(0)).collect::<Vec<_>>().as_ptr(),
+            WS_POPUP,
+            CW_USEDEFAULT, CW_USEDEFAULT, 1, 1,
+            HWND_MESSAGE, null_mut(), get_module_handle_exe(), null_mut()
+        )};
+        assert!(!hwnd.is_null(), "Unable to create message-only HWND");
+        OwnedWindow(Window::find(hwnd))
+    }
+}
+
+/// Public methods
+impl OwnedWindow {
+    /// Get the inner window without destroying it
+    pub fn leak(mut self) -> Window { std::mem::replace(&mut self.0, Window::null()) }
+}
+
+impl Drop for OwnedWindow {
+    fn drop(&mut self) {
+        let _ = self.0.destroy_ref();
+    }
+}
+
+impl Debug for OwnedWindow {
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+        fmt.debug_struct("OwnedWindow")
+            .field("hwnd", &self.0.hwnd)
+            .field("alive", &self.0.alive.get())
+            .finish()
+    }
+}
+
+impl Deref          for OwnedWindow { fn deref    (&    self) -> &    Self::Target { &    self.0 } type Target = Window; }
+impl DerefMut       for OwnedWindow { fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 } }
+impl AsRef<Window>  for OwnedWindow { fn as_ref   (&    self) -> &          Window { &    self.0 } }
+impl AsMut<Window>  for OwnedWindow { fn as_mut   (&mut self) -> &mut       Window { &mut self.0 } }
+
+
+
 thread_local! { static WINDOWS : RefCell<HashMap<HWND, AliveHandle>> = Default::default(); }
 
 lazy_static::lazy_static! {
@@ -140,8 +180,8 @@ unsafe extern "system" fn stub_window_proc(hwnd: HWND, msg: DWORD, wparam: WPARA
 
 
 #[test] fn stub_window_tests() {
-    let w = Window::create_stub("example"); assert!( w.is_alive());
-    w.clone().destroy().unwrap();           assert!(!w.is_alive());
-    w.clone().destroy().unwrap_err();       assert!(!w.is_alive());
-    w.clone().destroy().unwrap_err();       assert!(!w.is_alive());
+    let w = OwnedWindow::create_stub("example").leak(); assert!( w.is_alive());
+    w.clone().destroy().unwrap();                       assert!(!w.is_alive());
+    w.clone().destroy().unwrap_err();                   assert!(!w.is_alive());
+    w.clone().destroy().unwrap_err();                   assert!(!w.is_alive());
 }

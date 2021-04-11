@@ -79,38 +79,26 @@ unsafe fn default_windowed_presentation_parameters(hwnd: HWND) -> D3DPRESENT_PAR
 
 #[test] fn test_create_device() {
     {
-        let win = Window::create_stub("test_create_device 1");
+        let win = OwnedWindow::create_stub("test_create_device 1");
         let d3d = d3d9::create_d3d(true).unwrap();
-        let device = unsafe { d3d9::create_device_windowed(&d3d, &win) }.unwrap();
-        drop(device);
-        drop(d3d);
-        let _ = win.destroy();
+        let _device = unsafe { d3d9::create_device_windowed(&d3d, &win) }.unwrap();
     }
     {
-        let win = Window::create_stub("test_create_device 2");
+        let win = OwnedWindow::create_stub("test_create_device 2");
         let d3d = d3d9::create_d3d(true).unwrap();
-        let device = unsafe { d3d9::create_device_windowed(&d3d, &win) }.unwrap();
-        drop(device);
-        drop(d3d);
-        let _ = win.destroy();
+        let _device = unsafe { d3d9::create_device_windowed(&d3d, &win) }.unwrap();
     }
 }
 
 #[test] fn test_create_device_ex() {
     {
-        let win = Window::create_stub("test_create_device_ex 1");
+        let win = OwnedWindow::create_stub("test_create_device_ex 1");
         let d3dex = d3d9::create_d3d_ex(true).unwrap();
-        let deviceex = unsafe { d3d9::create_device_ex_windowed(&d3dex, &win) }.unwrap();
-        drop(deviceex);
-        drop(d3dex);
-        let _ = win.destroy();
+        let _deviceex = unsafe { d3d9::create_device_ex_windowed(&d3dex, &win) }.unwrap();
     }
     {
-        let win = Window::create_stub("test_create_device_ex 2");
+        let win = OwnedWindow::create_stub("test_create_device_ex 2");
         let d3dex = d3d9::create_d3d_ex(true).unwrap();
-        let deviceex = unsafe { d3d9::create_device_ex_windowed(&d3dex, &win) }.unwrap();
-        drop(deviceex);
-        drop(d3dex);
-        let _ = win.destroy();
+        let _deviceex = unsafe { d3d9::create_device_ex_windowed(&d3dex, &win) }.unwrap();
     }
 }
