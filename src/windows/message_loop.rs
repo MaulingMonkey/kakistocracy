@@ -18,23 +18,41 @@ use std::ptr::null_mut;
 /// Returns the `nExitCode` that was passed to [`PostQuitMessage`](https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-postquitmessage).
 pub fn message_loop_until_wm_quit() -> c_int {
     loop {
-        let mut msg = unsafe { std::mem::zeroed() };
-        while unsafe { PeekMessageW(&mut msg, null_mut(), 0, 0, PM_REMOVE) } != 0 {
-            match msg.message {
-                WM_QUIT => return msg.wParam as c_int,
-                _other  => {},
-            }
-            unsafe { TranslateMessage(&msg) }; // generate WM_CHAR, WM_DEADCHAR, WM_UNICHAR, etc.
-            unsafe { DispatchMessageW(&msg) }; // invoke WndProcs
+        if let Some(exit) = message_loop_one_frame() {
+            return exit;
         }
-        // TODO: rendering & per-frame tasks
-        LOCAL_POOL.with(|lp| {
-            if let Ok(mut pool) = lp.try_borrow_mut() {
-                pool.run_until_stalled();
-            }
-            // else we're recursively running a message loop within a task? probably an incredibly bad idea, but don't crash
-        });
     }
+}
+
+/// Run a message loop on this thread once.
+///
+/// If [`WM_QUIT`](https://docs.microsoft.com/en-us/windows/win32/winmsg/wm-quit) is encountered, returns `Some(nExitCode)` based on what was passed to [`PostQuitMessage`](https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-postquitmessage).
+pub fn message_loop_one_frame() -> Option<c_int> {
+    let mut msg = unsafe { std::mem::zeroed() };
+    while unsafe { PeekMessageW(&mut msg, null_mut(), 0, 0, PM_REMOVE) } != 0 {
+        match msg.message {
+            WM_QUIT => return Some(msg.wParam as c_int),
+            _other  => {},
+        }
+        unsafe { TranslateMessage(&msg) }; // generate WM_CHAR, WM_DEADCHAR, WM_UNICHAR, etc.
+        unsafe { DispatchMessageW(&msg) }; // invoke WndProcs
+    }
+
+    TL.with(|tl|{
+        // TODO: rendering & per-frame tasks
+        if let Ok(mut pool) = tl.local_pool.try_borrow_mut() {
+            pool.run_until_stalled();
+        }
+        // else we're recursively running a message loop within a task? probably an incredibly bad idea, but don't crash
+
+        if let Ok(mut each_frame) = tl.each_frame.try_borrow_mut() {
+            each_frame.append(&mut *tl.each_frame_pending.borrow_mut());
+            let efa = EachFrameArgs {};
+            retain_mut(&mut each_frame, |f| f(&efa));
+        }
+        // else we're recursively running a message loop within an each_frame callback? probably an incredibly bad idea, but don't crash
+    });
+    None
 }
 
 /// [`PostQuitMessage`](https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-postquitmessage), but safe.
@@ -44,7 +62,16 @@ pub fn post_quit_message(exit_code: c_int) {
 
 /// Run a future/task in the main message loop
 pub fn spawn_local<F: Future<Output = ()> + 'static>(f: F) -> Result<(), SpawnError> {
-    LOCAL_SPAWNER.with(|ls| ls.spawn_local(f))
+    TL.with(|tl| tl.local_spawner.spawn_local(f))
+}
+
+pub fn each_frame(f: impl 'static + FnMut(&EachFrameArgs) -> bool) {
+    TL.with(|tl| tl.each_frame_pending.borrow_mut().push(Box::new(f)));
+}
+
+#[non_exhaustive]
+pub struct EachFrameArgs {
+    // TODO: time deltas?
 }
 
 
@@ -53,9 +80,38 @@ pub fn spawn_local<F: Future<Output = ()> + 'static>(f: F) -> Result<(), SpawnEr
     atom as usize as *const _
 }
 
-thread_local! {
-    static LOCAL_POOL : RefCell<LocalPool> = Default::default();
-    static LOCAL_SPAWNER : LocalSpawner = LOCAL_POOL.with(|lp| lp.borrow().spawner());
+struct ThreadLocal {
+    local_pool:         RefCell<LocalPool>,
+    local_spawner:      LocalSpawner,
+    each_frame:         RefCell<Vec<Box<dyn FnMut(&EachFrameArgs) -> bool>>>,
+    each_frame_pending: RefCell<Vec<Box<dyn FnMut(&EachFrameArgs) -> bool>>>,
+}
+
+impl Default for ThreadLocal {
+    fn default() -> Self {
+        let local_pool          = LocalPool::new();
+        let local_spawner       = local_pool.spawner();
+        let local_pool          = RefCell::new(local_pool);
+        let each_frame          = Default::default();
+        let each_frame_pending  = Default::default();
+        Self { local_pool, local_spawner, each_frame, each_frame_pending }
+    }
+}
+
+thread_local! { static TL : ThreadLocal = ThreadLocal::default(); }
+
+fn retain_mut<T, F: FnMut(&mut T) -> bool>(vec: &mut Vec<T>, mut f: F) {
+    let len = vec.len();
+    let mut del = 0;
+    let v = &mut **vec;
+    for i in 0..len {
+        if !f(&mut v[i]) {
+            del += 1;
+        } else if del > 0 {
+            v.swap(i - del, i);
+        }
+    }
+    vec.truncate(len - del);
 }
 
 
