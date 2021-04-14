@@ -1,7 +1,5 @@
 #![allow(dead_code)] // XXX
 
-use void::Void;
-
 use winapi::shared::minwindef::DWORD;
 use winapi::shared::winerror::*;
 use winapi::um::errhandlingapi::GetLastError;
@@ -49,7 +47,7 @@ impl Error {
         }
     }
 
-    pub(crate) fn last(method: &'static str, note: &'static str,) -> Result<Void, Self> {
+    pub(crate) fn last<T>(method: &'static str, note: &'static str) -> Result<T, Self> {
         Err(Error::new_gle(method, get_last_error(), note))
     }
 
