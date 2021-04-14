@@ -56,7 +56,7 @@ const DEFAULT_PRESENT_FLAGS : DWORD =
     0;
 
 /// https://docs.microsoft.com/en-us/windows/win32/direct3d9/d3dpresent-parameters
-unsafe fn default_windowed_presentation_parameters(hwnd: HWND) -> D3DPRESENT_PARAMETERS {
+pub(crate) unsafe fn default_windowed_presentation_parameters(hwnd: HWND) -> D3DPRESENT_PARAMETERS {
     D3DPRESENT_PARAMETERS {
         BackBufferWidth:            0,
         BackBufferHeight:           0,

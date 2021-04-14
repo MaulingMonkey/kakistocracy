@@ -1,4 +1,4 @@
-#![cfg_attr(not(windows), allow(dead_code))]
+#![allow(dead_code)]
 
 use std::ops::*;
 
