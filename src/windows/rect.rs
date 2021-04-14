@@ -12,6 +12,7 @@ pub trait RectExt {
     type Size;
     fn width(&self) -> Self::Size;
     fn height(&self) -> Self::Size;
+    fn size(&self) -> (Self::Size, Self::Size) { (self.width(), self.height()) }
 }
 
 impl RectExt for RECT {
