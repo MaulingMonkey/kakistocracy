@@ -31,7 +31,7 @@ pub struct MultiWindowContext {
     dac:            Option<DeviceAndAssoc>, // might be None for headless servers, some device lost scenarios, etc.
     d3d:            mcom::Rc<IDirect3D9>,
     stub_window:    OwnedWindow,
-    windows:        Vec<Window>,
+    windows:        Vec<OwnedWindow>,
 }
 
 pub struct MultiWindowContextLock {
@@ -90,14 +90,14 @@ impl MultiWindowContext {
     pub fn create_fullscreen_window(&mut self, monitor: usize, title: &str) -> Result<Window, Error> {
         let window = Window::create_fullscreen(monitor, title)?;
         window.set(WindowAssoc::default());
-        self.windows.push(window.clone());
+        self.windows.push(OwnedWindow::new(window.clone()));
         Ok(window)
     }
 
     pub fn create_window_at(&mut self, title: &str, area: impl IntoRect) -> Result<Window, Error> {
         let window = Window::create_at(title, area)?;
         window.set(WindowAssoc::default());
-        self.windows.push(window.clone());
+        self.windows.push(OwnedWindow::new(window.clone()));
         Ok(window)
     }
 
@@ -128,7 +128,7 @@ impl MultiWindowContext {
                 },
             };
             Some(MultiWindowContextLockWindow {
-                window: window.clone(),
+                window: (*window).clone(),
                 swap_chain,
             })
         }).collect::<Vec<MultiWindowContextLockWindow>>();
