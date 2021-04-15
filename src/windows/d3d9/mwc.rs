@@ -101,16 +101,6 @@ impl MultiWindowContext {
         Ok(window)
     }
 
-    pub fn if_device<R>(&mut self, f: impl FnOnce(&mcom::Rc<IDirect3DDevice9>) -> R) -> Option<R> {
-        self.cull_destroyed_windows();
-        let _ = self.try_create_device();
-        if let Some(dac) = self.dac.as_ref() {
-            Some(f(&dac.device))
-        } else {
-            None
-        }
-    }
-
     pub fn lock(&mut self, allow_no_rendered_windows: bool) -> Option<MultiWindowContextLock> {
         self.cull_destroyed_windows();
         let _ = self.try_create_device();
