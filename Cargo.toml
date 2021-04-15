@@ -26,7 +26,6 @@ all-features    = true
 [dependencies]
 futures         = { version = "0.3", features = ["executor"] }
 lazy_static     = "1.4"
-void            = "1"
 
 [target.'cfg(windows)'.dependencies]
 mcom            = "0.1"
