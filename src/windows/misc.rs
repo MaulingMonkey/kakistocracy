@@ -8,6 +8,6 @@ use std::ptr::null_mut;
 
 
 /// <code>[GetModuleHandle](https://docs.microsoft.com/en-us/windows/win32/api/libloaderapi/nf-libloaderapi-getmodulehandlew)(NULL)</code>
-pub fn get_module_handle_exe() -> HMODULE {
+pub(crate) fn get_module_handle_exe() -> HMODULE {
     unsafe { GetModuleHandleW(null_mut()) }
 }
