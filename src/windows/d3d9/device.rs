@@ -15,11 +15,13 @@ use std::ptr::null_mut;
 /// ### Safety
 ///
 /// * Using the resulting Device after `window` is destroyed might be UB
+/// * This method [should not be run during the handling of `WM_CREATE`](https://docs.microsoft.com/en-us/windows/win32/api/d3d9/nf-d3d9-idirect3d9-createdevice#remarks).
+/// * Any call to create, release, or reset the device must be done using the same thread as the window procedure of the focus window.
 pub unsafe fn create_device_windowed(d3d: &mcom::Rc<IDirect3D9>, window: &Window) -> Result<mcom::Rc<IDirect3DDevice9>, Error> {
     let hwnd = window.hwnd().ok_or_else(|| Error::new("d3d9::create_device_windowed", "", 0, "window is not alive"))?;
     let mut pp = default_windowed_presentation_parameters(hwnd);
     let mut device = null_mut();
-    let hr = d3d.CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, hwnd, DEFAULT_BEHAVIOR_FLAGS, &mut pp, &mut device);
+    let hr = d3d.CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, null_mut(), DEFAULT_BEHAVIOR_FLAGS, &mut pp, &mut device);
     mcom::Rc::from_raw_opt(device).ok_or(Error::new_hr("IDirect3D9::CreateDevice", hr, "IDirect3DDevice9 is null"))
 }
 
@@ -28,11 +30,13 @@ pub unsafe fn create_device_windowed(d3d: &mcom::Rc<IDirect3D9>, window: &Window
 /// ### Safety
 ///
 /// * Using the resulting Device after `window` is destroyed might be UB
+/// * This method [should not be run during the handling of `WM_CREATE`](https://docs.microsoft.com/en-us/windows/win32/api/d3d9/nf-d3d9-idirect3d9-createdevice#remarks).
+/// * Any call to create, release, or reset the device must be done using the same thread as the window procedure of the focus window.
 pub unsafe fn create_device_ex_windowed(d3d: &mcom::Rc<IDirect3D9Ex>, window: &Window) -> Result<mcom::Rc<IDirect3DDevice9Ex>, Error> {
     let hwnd = window.hwnd().ok_or_else(|| Error::new("d3d9::create_device_ex_windowed", "", 0, "window is not alive"))?;
     let mut pp = default_windowed_presentation_parameters(hwnd);
     let mut device = null_mut();
-    let hr = d3d.CreateDeviceEx(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, hwnd, DEFAULT_BEHAVIOR_FLAGS, &mut pp, null_mut(), &mut device);
+    let hr = d3d.CreateDeviceEx(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, null_mut(), DEFAULT_BEHAVIOR_FLAGS, &mut pp, null_mut(), &mut device);
     mcom::Rc::from_raw_opt(device).ok_or(Error::new_hr("IDirect3D9Ex::CreateDeviceEx", hr, "IDirect3DDevice9Ex is null"))
 }
 
