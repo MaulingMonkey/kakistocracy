@@ -12,7 +12,7 @@ pub mod message;
 pub(crate) mod monitor;
 pub mod prelude;
 
-mod misc;           pub use misc::*;
+mod misc;           pub(crate) use misc::*;
 mod rect;           pub use rect::*;
 mod window;         pub use window::*;
 
