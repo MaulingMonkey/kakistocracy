@@ -1,5 +1,6 @@
 //use crate::utility::*;
 use crate::windows::*;
+use crate::windows::monitor::MonitorInfo;
 
 use wchar::wch_c;
 
@@ -45,7 +46,7 @@ impl Window {
                 let expected_monitor_name = format!(r"\\.\DISPLAY{}", n).encode_utf16().chain(Some(0)).collect::<Vec<u16>>();
                 let mut monitor : Result<RECT, Error> = Err(Error::new("Window::create_fullscreen", "", 0, "monitor matched no expected monitor"));
                 let mut no = 0;
-                enum_display_monitors((), None, |hmonitor, _hdc, _rect| {
+                monitor::enum_display_monitors((), None, |hmonitor, _hdc, _rect| {
                     no += 1;
                     let info = unsafe { MONITORINFOEXW::get(hmonitor) };
                     match info {

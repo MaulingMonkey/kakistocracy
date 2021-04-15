@@ -36,6 +36,7 @@ pub fn enum_display_monitors<F: FnMut(HMONITOR, HDC, &RECT) -> bool>(hdc: (), cl
 }
 
 /// [`EnumDisplayMonitors`](https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-enumdisplaymonitors) filtered into a [`Vec`]
+#[allow(dead_code)]
 pub fn collect_display_monitors<R, F: FnMut(HMONITOR, HDC, &RECT) -> R>(hdc: (), clip: impl Into<Option<RECT>>, mut proc: F) -> Vec<R> {
     let mut v = Vec::new();
     let success = enum_display_monitors(hdc, clip, |hmonitor, hdc, rect|{ v.push(proc(hmonitor, hdc, rect)); true });
