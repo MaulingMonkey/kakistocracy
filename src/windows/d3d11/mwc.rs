@@ -176,7 +176,6 @@ impl MultiWindowContext {
                         unsafe { mcom::Rc::from_raw_opt(bb as *mut ID3D11Resource)? } // panic on null?
                     };
 
-                    println!("RTV");
                     let rtv = {
                         let mut rtv = null_mut();
                         let _hr = unsafe { dac.device.CreateRenderTargetView(bb.as_ptr(), null_mut(), &mut rtv) };
