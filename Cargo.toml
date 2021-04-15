@@ -15,8 +15,28 @@ description     = "A pile of vaguely gamedev related code, governed by its least
 exclude         = [".vscode"]
 
 [features]
-default         = ["d3d9"]
+default         = ["d3d9", "d3d11"]
 d3d9            = ["winapi/d3d9", "winapi/d3d9caps", "winapi/d3d9types"]
+d3d11 = [
+    "winapi/dxgi",
+    "winapi/dxgi1_2",
+    "winapi/dxgi1_3",
+    "winapi/dxgi1_4",
+    "winapi/dxgi1_5",
+    "winapi/dxgi1_6",
+    "winapi/dxgidebug",
+    "winapi/dxgiformat",
+    "winapi/dxgitype",
+
+    "winapi/d3d11",
+    "winapi/d3d11_1",
+    "winapi/d3d11_2",
+    "winapi/d3d11_3",
+    "winapi/d3d11_4",
+    "winapi/d3d11sdklayers",
+    "winapi/d3d11shader",
+    "winapi/d3d11sdklayers",
+]
 
 
 
