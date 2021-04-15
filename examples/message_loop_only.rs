@@ -5,7 +5,7 @@
 #[cfg(windows)] fn main() {
     use kakistocracy::windows::*;
 
-    messages::post_quit(-42);
-    let exit = messages::loop_until_wm_quit();
+    message::post_quit(-42);
+    let exit = message::loop_until_wm_quit();
     assert_eq!(exit, -42);
 }
