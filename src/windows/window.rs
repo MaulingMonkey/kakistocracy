@@ -136,7 +136,7 @@ impl Window {
         } else if unsafe { DestroyWindow(self.hwnd) } != FALSE {
             Ok(())
         } else {
-            Err(Error::new_gle("DestroyWindow", get_last_error(), ""))
+            Error::last("DestroyWindow", "")
         }
     }
 
@@ -280,41 +280,37 @@ struct PerWindow {
 thread_local! { static WINDOWS : RefCell<HashMap<HWND, PerWindow>> = Default::default(); }
 
 lazy_static::lazy_static! {
-    static ref KAKISTOCRACY_STUB_WNDCLASS : ATOM = {
-        let atom = unsafe { RegisterClassW(&WNDCLASSW {
-            style:          0,
-            lpfnWndProc:    Some(stub_window_proc),
-            cbClsExtra:     0,
-            cbWndExtra:     0,
-            hInstance:      get_module_handle_exe(),
-            hIcon:          null_mut(),
-            hCursor:        LoadCursorW(null_mut(), IDC_ARROW),
-            hbrBackground:  null_mut(),
-            lpszMenuName:   null_mut(),
-            lpszClassName:  wch_c!("kakistocracy-stub-window").as_ptr(),
-        })};
-        assert!(atom != 0, "Unable to register \"kakistocracy-stub-window\" window class: 0x{:08x}", get_last_error());
-        atom
-    };
+    static ref KAKISTOCRACY_STUB_WNDCLASS : ATOM = unsafe { register_class_w(&WNDCLASSW {
+        style:          0,
+        lpfnWndProc:    Some(stub_window_proc),
+        cbClsExtra:     0,
+        cbWndExtra:     0,
+        hInstance:      get_module_handle_exe(),
+        hIcon:          null_mut(),
+        hCursor:        LoadCursorW(null_mut(), IDC_ARROW),
+        hbrBackground:  null_mut(),
+        lpszMenuName:   null_mut(),
+        lpszClassName:  wch_c!("kakistocracy-stub-window").as_ptr(),
+    })}.unwrap();
 
-    static ref KAKISTOCRACY_WNDCLASS : ATOM = {
-        let atom = unsafe { RegisterClassW(&WNDCLASSW {
-            style:          0,
-            lpfnWndProc:    Some(stub_window_proc),
-            cbClsExtra:     0,
-            cbWndExtra:     0,
-            hInstance:      get_module_handle_exe(),
-            hIcon:          null_mut(),
-            hCursor:        LoadCursorW(null_mut(), IDC_ARROW),
-            hbrBackground:  null_mut(),
-            lpszMenuName:   null_mut(),
-            lpszClassName:  wch_c!("kakistocracy-window").as_ptr(),
-        })};
-        assert!(atom != 0, "Unable to register \"kakistocracy-window\" window class: 0x{:08x}", get_last_error());
-        atom
-    };
+    static ref KAKISTOCRACY_WNDCLASS : ATOM = unsafe { register_class_w(&WNDCLASSW {
+        style:          0,
+        lpfnWndProc:    Some(stub_window_proc),
+        cbClsExtra:     0,
+        cbWndExtra:     0,
+        hInstance:      get_module_handle_exe(),
+        hIcon:          null_mut(),
+        hCursor:        LoadCursorW(null_mut(), IDC_ARROW),
+        hbrBackground:  null_mut(),
+        lpszMenuName:   null_mut(),
+        lpszClassName:  wch_c!("kakistocracy-window").as_ptr(),
+    })}.unwrap();
 }
 
+/// ### Safety
+/// * `hwnd` might be a real pointer in older versions of Windows
+/// * `wparam` / `lparam` might be treated as raw pointers depending on `msg`
+/// * ...
 unsafe extern "system" fn stub_window_proc(hwnd: HWND, msg: DWORD, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match msg {
         WM_CREATE   => drop(Window::on_create(hwnd)),
@@ -322,6 +318,19 @@ unsafe extern "system" fn stub_window_proc(hwnd: HWND, msg: DWORD, wparam: WPARA
         _other      => {},
     }
     DefWindowProcW(hwnd, msg, wparam, lparam)
+}
+
+/// ### Safety
+/// * `wndclass` should contain valid pointers
+/// * `wndclass.lpfnWndProc` is an unsafe fn and will be called by Win32
+/// * ...
+unsafe fn register_class_w(wndclass: &WNDCLASSW) -> Result<ATOM, Error> {
+    let atom = RegisterClassW(wndclass);
+    if atom != 0 {
+        Ok(atom)
+    } else {
+        Error::last("RegisterClassW", "")
+    }
 }
 
 #[allow(non_snake_case)] pub(crate) fn MAKEINTATOMW(atom: ATOM) -> *const u16 {

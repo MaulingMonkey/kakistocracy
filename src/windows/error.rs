@@ -1,3 +1,5 @@
+//! Types and traits for working with Win32 errors.
+
 #![allow(dead_code)] // XXX
 
 use winapi::shared::minwindef::DWORD;
@@ -9,7 +11,7 @@ use std::fmt::{self, Debug, Display, Formatter};
 
 
 /// [`GetLastError`](https://docs.microsoft.com/en-us/windows/win32/api/errhandlingapi/nf-errhandlingapi-getlasterror), but safe.
-pub fn get_last_error() -> DWORD {
+pub(crate) fn get_last_error() -> DWORD {
     unsafe { GetLastError() }
 }
 
@@ -33,9 +35,9 @@ pub struct Error {
 }
 
 impl Error {
-    pub fn as_u32(&self) -> u32 { self.error as _ }
-    pub fn as_hresult(&self) -> HRESULT { self.error as _ }
-    pub fn as_decomposed_hresult(&self) -> DecomposedHResult { DecomposedHResult::from(self.as_hresult()) }
+    pub fn u32(&self) -> u32 { self.error as _ }
+    pub fn hresult(&self) -> HRESULT { self.error as _ }
+    pub(crate) fn decomposed(&self) -> Decomposed { Decomposed::from(self.hresult()) }
 }
 
 impl Error {
@@ -78,22 +80,22 @@ impl std::error::Error for Error {}
 
 
 
-pub struct DecomposedHResult {
-    pub sev:        ErrorSeverity,
+pub(crate) struct Decomposed {
+    pub sev:        Severity,
     pub customer:   bool,
     pub reserved:   bool,
     pub facility:   u16,
     pub code:       u16,
 }
 
-impl From<HRESULT> for DecomposedHResult {
+impl From<HRESULT> for Decomposed {
     fn from(hresult: HRESULT) -> Self { Self {
         sev: match (hresult as u32) >> 30 {
-            0b00    => ErrorSeverity::Success,
-            0b01    => ErrorSeverity::Informational,
-            0b10    => ErrorSeverity::Warning,
-            0b11    => ErrorSeverity::Error,
-            sev     => panic!("BUG: DecomposedHResult::sev == 0x{:x}\nreport this to {}", sev, "https://github.com/MaulingMonkey/kakistocracy/issues"),
+            0b00    => Severity::Success,
+            0b01    => Severity::Informational,
+            0b10    => Severity::Warning,
+            0b11    => Severity::Error,
+            sev     => panic!("BUG: Decomposed::sev == 0x{:x}\nreport this to {}", sev, "https://github.com/MaulingMonkey/kakistocracy/issues"),
         },
         customer:   hresult & (1 << 29) != 0,
         reserved:   hresult & (1 << 28) != 0,
@@ -102,11 +104,11 @@ impl From<HRESULT> for DecomposedHResult {
     }}
 }
 
-#[repr(u8)]
+/// The severity of a given [`HRESULT`] ([`Success`](Severity::Success), [`Informational`](Severity::Informational), [`Warning`](Severity::Warning), or [`Error`](Severity::Error)).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum ErrorSeverity {
-    Success         = 0b00,
-    Informational   = 0b01,
-    Warning         = 0b10,
-    Error           = 0b11,
+pub enum Severity {
+    Success         /* = 0b00 */,
+    Informational   /* = 0b01 */,
+    Warning         /* = 0b10 */,
+    Error           /* = 0b11 */,
 }
