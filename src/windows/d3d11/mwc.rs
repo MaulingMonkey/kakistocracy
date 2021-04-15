@@ -1,7 +1,6 @@
 use crate::windows::*;
 
 use mcom::AsIUnknown;
-use winapi::Interface;
 use winapi::shared::dxgi::*;
 use winapi::shared::dxgiformat::{DXGI_FORMAT_B8G8R8A8_UNORM};
 use winapi::shared::dxgitype::*;
@@ -116,7 +115,6 @@ impl MultiWindowContext {
 
         let device = dac.device.clone();
         let immediate_context = dac.immediate_context.clone();
-        //let d3d = self.d3d.clone();
         let windows = self.windows.iter().filter_map(|window|{
             if !window.should_render() { return None; }
             let hwnd = window.hwnd()?;
@@ -129,21 +127,10 @@ impl MultiWindowContext {
                 Some(_) | None => {
                     *wa_swap_chain_rtv = None; // release previous swap chain before creating a new one
 
-                    let dxgi_device = dac.device.try_cast::<IDXGIDevice>()?;
-
-                    let dxgi_adapter = {
-                        let mut dxgi_adapter = null_mut();
-                        let _hr = unsafe { dxgi_device.GetParent(&IDXGIAdapter::uuidof(), &mut dxgi_adapter) };
-                        unsafe { mcom::Rc::from_raw_opt(dxgi_adapter as *mut IDXGIAdapter)? }
-                    };
-
-                    let dxgi_factory = {
-                        let mut dxgi_factory = null_mut();
-                        let _hr = unsafe { dxgi_adapter.GetParent(&IDXGIFactory::uuidof(), &mut dxgi_factory) };
-                        unsafe { mcom::Rc::from_raw_opt(dxgi_factory as *mut IDXGIFactory)? }
-                    };
-
-                    let bb_format = DXGI_FORMAT_B8G8R8A8_UNORM;
+                    let dxgi_device     = dac.device.to_dxgi_device();
+                    let dxgi_adapter    = dxgi_device.get_parent_dxgi_adapter().unwrap();
+                    let dxgi_factory    = dxgi_adapter.get_parent_dxgi_factory().unwrap();
+                    let bb_format       = DXGI_FORMAT_B8G8R8A8_UNORM;
 
                     let swap_chain = {
                         let mut swap_chain = null_mut();
@@ -169,19 +156,8 @@ impl MultiWindowContext {
                         unsafe { mcom::Rc::from_raw_opt(swap_chain)? } // panic on null?
                     };
 
-                    let bb = {
-                        let mut bb = null_mut();
-                        let _hr = unsafe { swap_chain.GetBuffer(0, &ID3D11Resource::uuidof(), &mut bb) };
-                        assert!(SUCCEEDED(_hr), "IDXGISwapChain::GetBuffer failed with HRESULT == 0x{:08x}", _hr as u32);
-                        unsafe { mcom::Rc::from_raw_opt(bb as *mut ID3D11Resource)? } // panic on null?
-                    };
-
-                    let rtv = {
-                        let mut rtv = null_mut();
-                        let _hr = unsafe { dac.device.CreateRenderTargetView(bb.as_ptr(), null_mut(), &mut rtv) };
-                        assert!(SUCCEEDED(_hr), "ID3D11Device::CreateRenderTargetView failed with HRESULT == 0x{:08x}", _hr as u32);
-                        unsafe { mcom::Rc::from_raw_opt(rtv)? } // panic on null?
-                    };
+                    let bb = swap_chain.get_buffer::<ID3D11Resource>(0).unwrap();
+                    let rtv = dac.device.create_render_target_view_from_resource(&bb).unwrap();
 
                     *wa_swap_chain_rtv = Some((swap_chain.clone(), rtv.clone()));
                     (swap_chain, rtv)
@@ -311,7 +287,6 @@ impl MultiWindowContext {
 }
 
 fn get_back_buffer_size(swap_chain: &mcom::Rc<IDXGISwapChain>) -> (u32, u32) {
-    let mut desc = unsafe { std::mem::zeroed() };
-    let _hr = unsafe { swap_chain.GetDesc(&mut desc) };
+    let desc = swap_chain.get_desc().unwrap();
     (desc.BufferDesc.Width, desc.BufferDesc.Height)
 }

@@ -7,11 +7,12 @@ pub use ::winapi;
 
 #[path = "d3d9/_d3d9.rs"  ] pub mod d3d9;
 #[path = "d3d11/_d3d11.rs"] pub mod d3d11;
+#[path = "dxgi/_dxgi.rs"  ] pub mod dxgi;
 
 pub mod error;      pub use error::Error;
 pub mod message;
 pub(crate) mod monitor;
-pub mod prelude;
+pub mod prelude;    pub use prelude::*;
 
 mod misc;           pub(crate) use misc::*;
 mod rect;           pub use rect::*;

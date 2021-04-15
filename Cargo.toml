@@ -18,15 +18,7 @@ exclude         = [".vscode"]
 default         = ["d3d9", "d3d11"]
 d3d9            = ["winapi/d3d9", "winapi/d3d9caps", "winapi/d3d9types"]
 d3d11 = [
-    "winapi/dxgi",
-    "winapi/dxgi1_2",
-    "winapi/dxgi1_3",
-    "winapi/dxgi1_4",
-    "winapi/dxgi1_5",
-    "winapi/dxgi1_6",
-    "winapi/dxgidebug",
-    "winapi/dxgiformat",
-    "winapi/dxgitype",
+    "dxgi",
 
     "winapi/d3d11",
     "winapi/d3d11_1",
@@ -36,6 +28,17 @@ d3d11 = [
     "winapi/d3d11sdklayers",
     "winapi/d3d11shader",
     "winapi/d3d11sdklayers",
+]
+dxgi = [
+    "winapi/dxgi",
+    "winapi/dxgi1_2",
+    "winapi/dxgi1_3",
+    "winapi/dxgi1_4",
+    "winapi/dxgi1_5",
+    "winapi/dxgi1_6",
+    "winapi/dxgidebug",
+    "winapi/dxgiformat",
+    "winapi/dxgitype",
 ]
 
 
