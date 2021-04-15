@@ -23,7 +23,7 @@ pub trait CreateFromDevice {
 ///
 /// The device may be dropped and recreated in device lost scenarios.
 /// "Additional" swap chains are created for each window, and recreated when the windows are resized.
-/// The "primary" / focus window is a hidden 1x1 message-only stub window.
+/// The "primary" window is a hidden 1x1 message-only stub window.
 ///
 /// [`IDirect3DDevice9`]:   https://docs.microsoft.com/en-us/windows/win32/api/d3d9helper/nn-d3d9helper-idirect3ddevice9
 pub struct MultiWindowContext {
