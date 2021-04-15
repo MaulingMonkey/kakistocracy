@@ -21,7 +21,10 @@ use std::rc::*;
 
 
 
-/// A safe wrapper around Win32 `HWND`s
+/// A safe wrapper around Win32 `HWND`s.  Will leave the underlying Window alive when dropped.
+///
+/// Since windows can be closed out from under this handle by external events (OS shutdown, clicking `[X]`, messages, etc.),
+/// this acts somewhat like a weak pointer, and most methods are falliable.
 #[derive(Clone)]
 pub struct Window {
     hwnd:   HWND,
@@ -31,6 +34,7 @@ pub struct Window {
 
 /// Construction methods
 impl Window {
+    /// Don't actually create a window.  Similar to creating and immediately `destroy_ref()`ing the window, but there is never an underlying HWND (the pointer is null.)
     pub fn null() -> Window { Window { hwnd: null_mut(), unique: Rc::new(()), assoc: Weak::new() } }
 
     /// Create a fullscreen window.  Unlike a maximized window, it has no title bar, and obscures the taskbar.
@@ -220,11 +224,16 @@ impl Hash       for Window { fn hash<H: Hasher>(&self, state: &mut H) { self.cmp
 
 
 
+/// A safe wrapper around Win32 `HWND`s.  Will destroy the underlying Window when dropped.
+///
+/// Since windows can be closed out from under this handle by external events (OS shutdown, clicking `[X]`, messages, etc.),
+/// this acts somewhat like a weak pointer, and most methods are falliable.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct OwnedWindow(Window);
 
 /// Construction methods
 impl OwnedWindow {
+    /// Take ownership over an existing [`Window`].
     pub fn new(window: Window) -> Self { Self(window) }
 
     /// Create an invisible, un-enumerated, 1x1 [Message-Only](https://docs.microsoft.com/en-us/windows/win32/winmsg/window-features#message-only-windows) window, that doesn't process any messages.
