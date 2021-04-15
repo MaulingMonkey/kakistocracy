@@ -1,3 +1,9 @@
+//! Utility methods for interacting with Win32 messages, message queues, and loops thereof.
+//!
+//! ### See Also
+//! * [About Messages and Message Queues](https://docs.microsoft.com/en-us/windows/win32/winmsg/about-messages-and-message-queues)
+//! * [Using Messages and Message Queues](https://docs.microsoft.com/en-us/windows/win32/winmsg/using-messages-and-message-queues)
+
 use crate::windows::*;
 
 use futures::Future;
@@ -5,7 +11,6 @@ use futures::executor::*;
 use futures::task::*;
 
 use winapi::ctypes::c_int;
-use winapi::shared::minwindef::*;
 use winapi::um::winuser::*;
 
 use std::cell::RefCell;
@@ -16,9 +21,9 @@ use std::ptr::null_mut;
 /// Run a message loop on this thread until [`WM_QUIT`](https://docs.microsoft.com/en-us/windows/win32/winmsg/wm-quit) is encountered.
 ///
 /// Returns the `nExitCode` that was passed to [`PostQuitMessage`](https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-postquitmessage).
-pub fn message_loop_until_wm_quit() -> c_int {
+pub fn loop_until_wm_quit() -> c_int {
     loop {
-        if let Some(exit) = message_loop_one_frame() {
+        if let Some(exit) = loop_one_frame() {
             return exit;
         }
     }
@@ -27,7 +32,7 @@ pub fn message_loop_until_wm_quit() -> c_int {
 /// Run a message loop on this thread once.
 ///
 /// If [`WM_QUIT`](https://docs.microsoft.com/en-us/windows/win32/winmsg/wm-quit) is encountered, returns `Some(nExitCode)` based on what was passed to [`PostQuitMessage`](https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-postquitmessage).
-pub fn message_loop_one_frame() -> Option<c_int> {
+pub fn loop_one_frame() -> Option<c_int> {
     let mut msg = unsafe { std::mem::zeroed() };
     while unsafe { PeekMessageW(&mut msg, null_mut(), 0, 0, PM_REMOVE) } != 0 {
         match msg.message {
@@ -56,15 +61,20 @@ pub fn message_loop_one_frame() -> Option<c_int> {
 }
 
 /// [`PostQuitMessage`](https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-postquitmessage), but safe.
-pub fn post_quit_message(exit_code: c_int) {
+pub fn post_quit(exit_code: c_int) {
     unsafe { PostQuitMessage(exit_code) }
 }
 
-/// Run a future/task in the main message loop
+/// Run a future/task in the current thread's message handling loop
 pub fn spawn_local<F: Future<Output = ()> + 'static>(f: F) -> Result<(), SpawnError> {
     TL.with(|tl| tl.local_spawner.spawn_local(f))
 }
 
+/// Run logic in the current thread's message handling loop "each frame".
+///
+/// Read "each frame" as: roughly in sync with the refresh rate of one of your monitors, possibly skipping some if falling behind.
+///
+/// If the callback ever returns `false`, it will be unregistered and not called again.
 pub fn each_frame(f: impl 'static + FnMut(&EachFrameArgs) -> bool) {
     TL.with(|tl| tl.each_frame_pending.borrow_mut().push(Box::new(f)));
 }
@@ -75,10 +85,6 @@ pub struct EachFrameArgs {
 }
 
 
-
-#[allow(non_snake_case)] pub(crate) fn MAKEINTATOMW(atom: ATOM) -> *const u16 {
-    atom as usize as *const _
-}
 
 struct ThreadLocal {
     local_pool:         RefCell<LocalPool>,

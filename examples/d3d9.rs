@@ -16,10 +16,10 @@
     mwc.create_fullscreen_window(2, "fullscreen").unwrap();
 
     let mut frames = 60 * 5;
-    each_frame(move |_| {
+    messages::each_frame(move |_| {
         frames -= 1;
         if frames == 0 {
-            post_quit_message(0);
+            messages::post_quit(0);
         } else if let Some(mwc) = mwc.lock(false) {
             for window in mwc.windows.iter() {
                 unsafe { window.bind(&mwc.device) }.unwrap();
@@ -31,5 +31,5 @@
         }
         true
     });
-    message_loop_until_wm_quit();
+    messages::loop_until_wm_quit();
 }

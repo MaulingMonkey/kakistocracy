@@ -323,6 +323,10 @@ unsafe extern "system" fn stub_window_proc(hwnd: HWND, msg: DWORD, wparam: WPARA
     DefWindowProcW(hwnd, msg, wparam, lparam)
 }
 
+#[allow(non_snake_case)] pub(crate) fn MAKEINTATOMW(atom: ATOM) -> *const u16 {
+    atom as usize as *const _
+}
+
 
 
 #[test] fn stub_window_tests() {
