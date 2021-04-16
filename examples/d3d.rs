@@ -17,8 +17,8 @@
     mwc11.create_window_at("wide11", [330..330+320,  10.. 10+230]).unwrap();
     mwc9 .create_window_at("tall9",  [ 10.. 10+240, 250..250+320]).unwrap();
     mwc11.create_window_at("tall11", [250..250+240, 250..250+320]).unwrap();
-    mwc9 .create_fullscreen_window(2, "fullscreen9").unwrap();
-    mwc11.create_fullscreen_window(1, "fullscreen11").unwrap();
+    let _ = mwc9 .create_fullscreen_window(2, "fullscreen9");
+    let _ = mwc11.create_fullscreen_window(3, "fullscreen11");
 
     let mut frames = 60 * 5;
     message::each_frame(move |_| {
