@@ -4,6 +4,7 @@
 
 #[cfg(windows)] fn main() {
     use kakistocracy::windows::*;
+    use kakistocracy::windows::winapi::shared::guiddef::GUID;
     use kakistocracy::windows::winapi::shared::d3d9types::D3DCLEAR_TARGET;
 
     use std::ptr::*;
@@ -20,7 +21,7 @@
     let _ = mwc9 .create_fullscreen_window(2, "fullscreen9");
     let _ = mwc11.create_fullscreen_window(3, "fullscreen11");
 
-    let mut frames = 60 * 5;
+    let mut frames : u32 = 60 * 5;
     message::each_frame(move |_| {
         frames -= 1;
         if frames == 0 {
@@ -29,10 +30,19 @@
         } else {
             if let Some(mwc9) = mwc9.lock(false) {
                 for window in mwc9.windows.iter() {
+                    let guid = GUID { Data1: 0xe071bda0, Data2: 0x4576, Data3: 0x40b0, Data4: *b"\x8e\xd4\x86\x61\xd6\x60\xe7\x63" };
+                    let bb = mwc9.device.get_back_buffer(0, 0).unwrap();
+                    bb.set_private_data_raw(&guid, &frames.to_ne_bytes()[..]).unwrap();
+
                     unsafe { window.bind(&mwc9.device) }.unwrap();
                     let _hr = unsafe { mwc9.device.Clear(0, null(), D3DCLEAR_TARGET, 0xFF112233, 0.0, 0) };
                     let _hr = unsafe { window.swap_chain.Present(null(), null(), null_mut(), null(), 0) };
                     // XXX: error checking?
+
+                    let mut data = (frames+1).to_ne_bytes();
+                    bb.get_private_data_raw(&guid, &mut data[..]).unwrap();
+                    bb.free_private_data(&guid).unwrap();
+                    assert!(data == frames.to_ne_bytes());
                 }
             }
 
