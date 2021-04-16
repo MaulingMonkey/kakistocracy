@@ -10,10 +10,13 @@ pub trait RectExt {
     /// [`LONG`] for [`RECT`].  A component of a position in the coordinate space.  Likely signed.
     type Pos;
 
-    /// `left` .. `right`
+    /// `(cx, cy)`
+    fn center(&self) -> (Self::Pos, Self::Pos);
+
+    /// `left .. right`
     fn xrange(&self) -> Range<Self::Pos>;
 
-    /// `top` .. `bottom`
+    /// `top .. bottom`
     fn yrange(&self) -> Range<Self::Pos>;
 
     /// [`ULONG`] for [`RECT`].  A component of a size that should cover the entire coordinate space.  Unsigned.
@@ -33,6 +36,7 @@ pub trait RectExt {
 
 impl RectExt for RECT {
     type Pos = LONG;
+    fn center(&self) -> (LONG, LONG) { (avg(self.left, self.right), avg(self.top, self.bottom)) }
     fn xrange(&self) -> Range<LONG> { self.left .. self.right }
     fn yrange(&self) -> Range<LONG> { self.top .. self.bottom }
 
@@ -110,4 +114,8 @@ impl IntoRect for [Range<LONG>; 2] {
         right:  self[0].end,
         bottom: self[1].end,
     }}
+}
+
+fn avg(a: LONG, b: LONG) -> LONG {
+    (((a as i64) + (b as i64)) / 2) as LONG
 }
