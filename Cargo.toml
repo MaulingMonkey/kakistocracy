@@ -58,7 +58,11 @@ wchar           = "0.6" # TODO: replace with abistr 0.2
 [target.'cfg(windows)'.dependencies.winapi]
 version         = "0.3.9"
 features = [
+    # misc
+    "std",
+
     # shared
+    "guiddef",
     "minwindef",
     "ntdef",
     "windef",
