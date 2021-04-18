@@ -1,23 +1,21 @@
-#![allow(dead_code)]
+#![allow(dead_code)] // XXX
 
-use super::Error;
+use crate::windows::type_guid;
 
 use winapi::Interface;
 use winapi::ctypes::c_void;
 use winapi::shared::guiddef::{GUID, REFIID, IsEqualGUID};
 use winapi::shared::minwindef::ULONG;
 use winapi::shared::winerror::*;
-use winapi::um::combaseapi::CoCreateGuid;
 use winapi::um::unknwnbase::{IUnknown, IUnknownVtbl};
 
 use std::any::*;
 use std::borrow::Borrow;
-use std::collections::HashMap;
 use std::convert::*;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::mem::forget;
 use std::ptr::*;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 // TODO:
 // - [ ] move into mcom?
@@ -107,16 +105,3 @@ impl<T: Any + Display> Display for ComBox<T> { fn fmt(&self, fmt: &mut Formatter
 // - AsMut      (mutable access when COM objects are always refcounted / typically shared)
 // - BorrowMut  (mutable access when COM objects are always refcounted / typically shared)
 // - DerefMut   (mutable access when COM objects are always refcounted / typically shared)
-
-
-
-lazy_static::lazy_static! { static ref TYPE_GUIDS : Mutex<HashMap<TypeId, GUID>> = Default::default(); }
-
-fn type_guid<T: Any>() -> GUID { *TYPE_GUIDS.lock().unwrap().entry(TypeId::of::<T>()).or_insert_with(|| co_create_guid().unwrap()) }
-
-fn co_create_guid() -> Result<GUID, Error> {
-    let mut guid = unsafe { std::mem::zeroed() };
-    let hr = unsafe { CoCreateGuid(&mut guid) };
-    Error::check_hr("CoCreateGuid", hr, "")?;
-    Ok(guid)
-}
