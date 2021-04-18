@@ -7,3 +7,4 @@ mod device;                     pub use device::*;
 mod mwc;                        pub use mwc::*;
 pub mod prelude;                pub use prelude::*;
 mod texture_cache;              pub use texture_cache::*;
+mod traits;                     pub use traits::*;

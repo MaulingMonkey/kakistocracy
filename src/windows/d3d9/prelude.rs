@@ -1,11 +1,12 @@
 use crate::windows::Error;
+use crate::windows::d3d9::Index;
 
 use mcom::AsIUnknown;
 use winapi::Interface;
 use winapi::shared::d3d9::*;
 use winapi::shared::d3d9types::*;
 use winapi::shared::guiddef::GUID;
-use winapi::shared::minwindef::DWORD;
+use winapi::shared::minwindef::{DWORD, UINT};
 use winapi::um::unknwnbase::IUnknown;
 
 use std::convert::*;
@@ -15,6 +16,7 @@ use std::ptr::*;
 
 pub trait D3d9DeviceExt {
     fn get_back_buffer(&self, swap_chain: u32, back_buffer: u32) -> Result<mcom::Rc<IDirect3DSurface9>, Error>;
+    unsafe fn create_index_buffer_from<I: Index>(&self, usage: DWORD, pool: D3DPOOL, data: &[I]) -> Result<mcom::Rc<IDirect3DIndexBuffer9>, Error>;
 }
 
 pub trait D3d9SwapChainExt {
@@ -50,6 +52,24 @@ impl D3d9DeviceExt for mcom::Rc<IDirect3DDevice9> {
         let mut bb = null_mut();
         let hr = unsafe { self.GetBackBuffer(swap_chain, back_buffer, D3DBACKBUFFER_TYPE_MONO, &mut bb) };
         unsafe { mcom::Rc::from_raw_opt(bb).ok_or(Error::new_hr("IDirect3DSwapChain9::GetBackBuffer", hr, "IDirect3DSurface9 is null")) }
+    }
+
+    unsafe fn create_index_buffer_from<I: Index>(&self, usage: DWORD, pool: D3DPOOL, data: &[I]) -> Result<mcom::Rc<IDirect3DIndexBuffer9>, Error> {
+        let size : UINT = std::mem::size_of_val(data).try_into().map_err(|_| Error::new("mcom::Rc<IDirect3DDevice9>::create_index_buffer_from", "", 0, "size_of_val(data) exceeded UINT"))?;
+        let mut ib = null_mut();
+        let hr = self.CreateIndexBuffer(size, usage, I::d3dfmt(), pool, &mut ib, null_mut());
+        let ib = mcom::Rc::from_raw_opt(ib).ok_or(Error::new_hr("IDirect3DDevice9::CreateIndexBuffer", hr, "IDirect3DIndexBuffer9 is null"))?;
+
+        let mut lock = null_mut();
+        let hr = ib.Lock(0, 0, &mut lock, 0);
+        Error::check_hr("IDirect3DIndexBuffer9::Lock", hr, "")?;
+
+        std::ptr::copy_nonoverlapping(data.as_ptr(), lock as *mut I, data.len());
+
+        let hr = ib.Unlock();
+        Error::check_hr("IDirect3DIndexBuffer9::Unlock", hr, "")?;
+
+        Ok(ib)
     }
 }
 
