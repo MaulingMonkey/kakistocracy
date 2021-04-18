@@ -50,6 +50,7 @@ default-target  = "x86_64-pc-windows-msvc"
 [dependencies]
 futures         = { version = "0.3", features = ["executor"] }
 lazy_static     = "1.4"
+png             = "0.16"
 
 [target.'cfg(windows)'.dependencies]
 mcom            = "0.1"

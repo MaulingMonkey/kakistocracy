@@ -14,7 +14,7 @@ pub mod message;
 pub(crate) mod monitor;
 pub mod prelude;    pub use prelude::*;
 
-mod com_box;        #[allow(unused_imports)] pub(crate) use com_box::*;
+mod com_box;        pub(crate) use com_box::*;
 mod guid;           pub(crate) use guid::*;
 mod misc;           pub(crate) use misc::*;
 mod rect;           pub use rect::*;

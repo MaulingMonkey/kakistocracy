@@ -123,3 +123,7 @@ pub enum Severity {
     Warning         /* = 0b10 */,
     Error           /* = 0b11 */,
 }
+
+#[allow(non_snake_case)] pub(crate) const fn MAKE_HRESULT(sev: u8, fac: u16, code: u16) -> HRESULT {
+    (((sev as u32) << 31) | ((fac as u32) << 16) | ((code as u32))) as HRESULT
+}
