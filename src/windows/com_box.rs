@@ -16,7 +16,6 @@ use std::collections::HashMap;
 use std::convert::*;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::mem::forget;
-use std::ops::Deref;
 use std::ptr::*;
 use std::sync::{Arc, Mutex};
 
@@ -47,10 +46,12 @@ impl<T: Any> ComBox<T> {
         unsafe { mcom::Rc::from_raw_unchecked(cb) }
     }
 
+    pub fn as_inner(&self) -> &T { &self.value }
+
     unsafe extern "system" fn add_ref(this: *mut IUnknown) -> ULONG {
         // https://docs.microsoft.com/en-us/windows/win32/api/unknwn/nf-unknwn-iunknown-addref
         let this = Arc::from_raw(this as *mut Self);
-        let rc = Arc::strong_count(&this);
+        let rc = Arc::strong_count(&this) + 1;
         forget(this.clone());
         forget(this);
         rc.try_into().unwrap()
@@ -69,6 +70,7 @@ impl<T: Any> ComBox<T> {
         if riid.is_null() || ppv_object.is_null() {
             E_POINTER
         } else if IsEqualGUID(&*riid, &IUnknown::uuidof()) || IsEqualGUID(&*riid, &Self::uuidof()) {
+            Self::add_ref(this);
             *ppv_object = this.cast();
             S_OK
         } else {
@@ -84,7 +86,9 @@ unsafe impl<T: Any + Sync> Sync for ComBox<T> {}
 impl<T: Any> Interface  for ComBox<T> { fn uuidof() -> GUID { type_guid::<Self>() } }
 impl<T: Any> AsRef<T>   for ComBox<T> { fn as_ref(&self) -> &T { &self.value } }
 impl<T: Any> Borrow<T>  for ComBox<T> { fn borrow(&self) -> &T { &self.value } }
-impl<T: Any> Deref      for ComBox<T> { fn deref(&self)  -> &T { &self.value } type Target = T; }
+// XXX: Should this deref to T (convenient), or to IUnknown (consistent, might be required for future COM pointers)
+//impl<T: Any> Deref      for ComBox<T> { fn deref(&self)  -> &IUnknown { unsafe { std::mem::transmute(self) } } type Target = IUnknown; }
+//impl<T: Any> Deref      for ComBox<T> { fn deref(&self)  -> &T { &self.value } type Target = T; }
 
 impl<T: Any + Debug  > Debug   for ComBox<T> { fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result { Debug  ::fmt(&self.value, fmt) } }
 impl<T: Any + Display> Display for ComBox<T> { fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result { Display::fmt(&self.value, fmt) } }
