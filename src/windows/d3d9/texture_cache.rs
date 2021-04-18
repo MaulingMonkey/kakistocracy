@@ -96,49 +96,59 @@ impl BasicTextureCache {
     }
 
     fn entry_2d_file_bytes(&self, bytes: &[u8]) -> Result<Entry2D, Box<dyn std::error::Error>> {
-        let decoder = png::Decoder::new(bytes);
+        let mut decoder = png::Decoder::new(bytes);
+        decoder.set_transformations(
+            // png::ColorType::* is in native (little) endian
+            // D3DFMT_* is in big endian
+            png::Transformations::BGR           |
+            png::Transformations::EXPAND        |
+            png::Transformations::GRAY_TO_RGB   |
+            png::Transformations::PACKING       |
+            png::Transformations::IDENTITY
+        );
         let (info, mut reader) = decoder.read_info()?;
         let mut buf = vec![0; info.buffer_size()];
         reader.next_frame(&mut buf)?;
         assert!(info.bit_depth == png::BitDepth::Eight);
-        let mut swap = &mut buf[..];
-        let fmt = match info.color_type {
-            // png::ColorType::* is in native (little) endian
-            // D3DFMT_* is in big endian
-
+        let (buf, fmt, line_size) = match info.color_type {
             png::ColorType::RGB => {
-                while let [r, _g, b, rest @ ..] = swap {
-                    std::mem::swap(r, b); // RGB => BGR
-                    swap = rest;
+                let mut src = &buf[..];
+                let mut buf2 = Vec::<u8>::new();
+                buf2.reserve(buf.len() * 4/3);
+                while let [b, g, r, ref rest @ ..] = *src {
+                    buf2.push(b);
+                    buf2.push(g);
+                    buf2.push(r);
+                    buf2.push(0xFF);
+                    src = rest;
                 }
-                D3DFMT_R8G8B8
+                (buf2, D3DFMT_A8R8G8B8, info.line_size * 4/3)
             },
-            png::ColorType::RGBA => {
-                while let [r, _g, b, _a, rest @ ..] = swap {
-                    std::mem::swap(r, b); // RGBA => BGRA
-                    swap = rest;
-                }
-                D3DFMT_A8R8G8B8
-            },
+            png::ColorType::RGBA => (buf, D3DFMT_A8R8G8B8, info.line_size),
             _other => panic!("BUG: png::{:?} not supported by BasicTextureCache, was expected to be normalized to RGB or RGBA", _other), // should've been normalized?
         };
 
         let mut tex = null_mut();
-        let hr = unsafe { self.device.CreateTexture(info.width, info.height, 1, 0, fmt, D3DPOOL_DEFAULT, &mut tex, null_mut()) };
-        Error::check_hr("IDirect3DDevice9::CreateTexture", hr, "")?;
+        let hr = unsafe { self.device.CreateTexture(info.width, info.height, 1, D3DUSAGE_DYNAMIC, fmt, D3DPOOL_DEFAULT, &mut tex, null_mut()) };
+        let err = Error::check_hr("IDirect3DDevice9::CreateTexture", hr, "");
+        if cfg!(debug_assertions) {
+            err.unwrap();
+        } else {
+            err?;
+        }
         let tex = unsafe { mcom::Rc::from_raw(tex) };
 
         let mut lock = unsafe { std::mem::zeroed() };
-        let hr = unsafe { tex.LockRect(0, &mut lock, null(), 0) };
+        let hr = unsafe { tex.LockRect(0, &mut lock, null(), D3DLOCK_DISCARD) };
         Error::check_hr("IDirect3DTexture9::LockRect", hr, "")?;
 
         let dst_pitch = lock.Pitch as usize;
         let dst_scan0 : *mut u8 = lock.pBits.cast();
-        debug_assert!(dst_pitch >= info.line_size);
+        debug_assert!(dst_pitch >= line_size);
         for y in 0 .. info.height as usize {
             let dst_scany = unsafe { dst_scan0.add(lock.Pitch as usize * y) };
-            let src_start = y * info.line_size;
-            let src_end = src_start + info.line_size;
+            let src_start = y * line_size;
+            let src_end = src_start + line_size;
             let src = &buf[src_start .. src_end];
             unsafe { std::ptr::copy_nonoverlapping(src.as_ptr(), dst_scany, src.len()) };
         }
