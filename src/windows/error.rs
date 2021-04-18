@@ -26,7 +26,7 @@ pub(crate) fn get_last_error() -> DWORD {
 /// ### See Also
 /// * [System Error Codes](https://docs.microsoft.com/en-us/windows/win32/debug/system-error-codes)
 /// * [hresult.info](https://www.hresult.info/)
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Error {
     pub(crate) method:          &'static str,
     pub(crate) error_source:    &'static str,
@@ -63,6 +63,17 @@ impl Error {
 
     pub(crate) fn new_hr(method: &'static str, hr: HRESULT, note: &'static str) -> Self {
         Self::new(method, "HRESULT", hr as _, note)
+    }
+}
+
+impl Debug for Error {
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+        fmt.debug_struct("kakistocracy::windows::Error")
+            .field("method",        &self.method)
+            .field("error_source",  &self.error_source)
+            .field("error",         &format_args!("0x{:08X}", self.error))
+            .field("note",          &self.note)
+            .finish()
     }
 }
 
