@@ -6,7 +6,6 @@ use winapi::shared::d3d9::*;
 use winapi::shared::d3d9types::*;
 use winapi::shared::guiddef::GUID;
 use winapi::shared::minwindef::DWORD;
-use winapi::shared::winerror::SUCCEEDED;
 use winapi::um::unknwnbase::IUnknown;
 
 use std::convert::*;
@@ -65,7 +64,7 @@ impl D3d9SwapChainExt for mcom::Rc<IDirect3DSwapChain9> {
 impl D3d9ResourceExt for mcom::Rc<IDirect3DResource9> {
     fn free_private_data(&self, guid: &GUID) -> Result<(), Error> {
         let hr = unsafe { self.FreePrivateData(guid) };
-        if SUCCEEDED(hr) { Ok(()) } else { Err(Error::new_hr("IDirect3DResource9::FreePrivateData", hr, "")) }
+        Error::check_hr("IDirect3DResource9::FreePrivateData", hr, "")
     }
 
     fn get_private_data_raw<'d>(&self, guid: &GUID, data: &'d mut [u8]) -> Result<&'d [u8], Error> {
@@ -73,22 +72,24 @@ impl D3d9ResourceExt for mcom::Rc<IDirect3DResource9> {
         let mut n : DWORD = max;
         let hr = unsafe { self.GetPrivateData(guid, data.as_mut_ptr().cast(), &mut n) };
         let read = n.min(max) as usize;
-        if SUCCEEDED(hr) { Ok(&data[..read]) } else { Err(Error::new_hr("IDirect3DResource9::GetPrivateData", hr, "")) }
+        Error::check_hr("IDirect3DResource9::GetPrivateData", hr, "")?;
+        Ok(&data[..read])
     }
 
     fn set_private_data_raw(&self, guid: &GUID, data: &[u8]) -> Result<(), Error> {
         let n : DWORD = data.len().try_into().map_err(|_| Error::new("<D3d9DResourceExt for mcom::Rc<IDirect3DResource9>>::set_private_data", "", 0, "data length exceeds DWORD"))?;
         let hr = unsafe { self.SetPrivateData(guid, data.as_ptr().cast(), n, 0) };
-        if SUCCEEDED(hr) { Ok(()) } else { Err(Error::new_hr("IDirect3DResource9::GetPrivateData", hr, "")) }
+        Error::check_hr("IDirect3DResource9::GetPrivateData", hr, "")
     }
 
     unsafe fn get_private_data_com<I: Interface>(&self, guid: &GUID) -> Result<mcom::Rc<I>, Error> {
+        // NOTE: GetPrivateData does call data->AddRef() if it was set via D3DSPD_IUNKNOWN
         let sizeof_iunknown_ptr = std::mem::size_of::<*mut I>() as DWORD;
         let mut n = sizeof_iunknown_ptr;
         let mut data = 0usize.to_ne_bytes();
         let hr = self.GetPrivateData(guid, data.as_mut_ptr().cast(), &mut n);
         assert!(n == 0 || n == sizeof_iunknown_ptr, "D3d9ResourceExt::get_private_data_com called on private data that wasn't pointer sized.  This probably isn't a COM pointer.  This probably *is* a serious bug that may lead to undefined behavior if the private data ever has the same size as a COM pointer.");
-        if !SUCCEEDED(hr) { return Err(Error::new_hr("IDirect3DResource9::GetPrivateData", hr, "")) }
+        Error::check_hr("IDirect3DResource9::GetPrivateData", hr, "")?;
         let data = usize::from_ne_bytes(data) as *mut IUnknown;
         let data = mcom::Rc::from_raw_opt(data).ok_or(Error::new("D3d9ResourceExt::get_private_data_com", "", 0, "instance is null"))?;
         let data = data.try_cast::<I>().ok_or(Error::new("D3d9ResourceExt::get_private_data_com", "", 0, "instance doesn't implement the interface"))?;
@@ -96,11 +97,11 @@ impl D3d9ResourceExt for mcom::Rc<IDirect3DResource9> {
     }
 
     fn set_private_data_com<I: Interface>(&self, guid: &GUID, data: &mcom::Rc<I>) -> Result<(), Error> {
+        // NOTE: SetPrivateData does call data->AddRef()
         const D3DSPD_IUNKNOWN : DWORD = 0x00000001; // C:\Program Files (x86)\Windows Kits\10\Include\10.0.19041.0\shared\d3d9.h
-        let data = data.as_iunknown_ptr() as usize;
-        let data = data.to_ne_bytes();
-        let hr = unsafe { self.SetPrivateData(guid, data.as_ptr().cast(), data.len() as DWORD, D3DSPD_IUNKNOWN) };
-        if SUCCEEDED(hr) { Ok(()) } else { Err(Error::new_hr("IDirect3DResource9::GetPrivateData", hr, "")) }
+        let hr = unsafe { self.SetPrivateData(guid, data.as_iunknown_ptr().cast(), std::mem::size_of::<*mut IUnknown>() as DWORD, D3DSPD_IUNKNOWN) };
+        Error::check_hr("IDirect3DResource9::SetPrivateData", hr, "")?;
+        Ok(())
     }
 }
 
