@@ -17,6 +17,10 @@ pub trait CreateFromDevice {
     fn new(device: &mcom::Rc<IDirect3DDevice9>) -> Self;
 }
 
+impl<T: From<mcom::Rc<IDirect3DDevice9>>> CreateFromDevice for T {
+    fn new(device: &mcom::Rc<IDirect3DDevice9>) -> Self { Self::from(device.clone()) }
+}
+
 
 
 /// Shares [`IDirect3DDevice9`]s between multiple windows.
