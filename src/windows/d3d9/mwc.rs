@@ -45,8 +45,11 @@ pub struct MultiWindowContextLock {
 }
 
 pub struct MultiWindowContextLockWindow {
+    pub d3d:        mcom::Rc<IDirect3D9>,
+    pub device:     mcom::Rc<IDirect3DDevice9>,
     pub window:     Window,
     pub swap_chain: mcom::Rc<IDirect3DSwapChain9>,
+    client_size:    (u32, u32),
 }
 
 
@@ -132,8 +135,11 @@ impl MultiWindowContext {
                 },
             };
             Some(MultiWindowContextLockWindow {
+                d3d: d3d.clone(),
+                device: device.clone(),
                 window: (*window).clone(),
                 swap_chain,
+                client_size,
             })
         }).collect::<Vec<MultiWindowContextLockWindow>>();
         if windows.is_empty() && !allow_no_rendered_windows { return None; }
@@ -170,6 +176,14 @@ impl MultiWindowContextLockWindow {
 
         Ok(())
     }
+
+    pub fn client_size  (&self) -> (u32, u32)   { self.client_size }
+    pub fn client_width (&self) -> u32          { self.client_size.0 }
+    pub fn client_height(&self) -> u32          { self.client_size.1 }
+
+    pub fn client_size_usize    (&self) -> (usize, usize)   { let (w, h) = self.client_size; (w as usize, h as usize) }
+    pub fn client_width_usize   (&self) -> usize            { self.client_size.0 as usize }
+    pub fn client_height_usize  (&self) -> usize            { self.client_size.1 as usize }
 }
 
 
