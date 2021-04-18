@@ -28,21 +28,18 @@
 
 
     struct Data9 {
-        quad_ib:    mcom::Rc<IDirect3DIndexBuffer9>,
-        quad_vb:    mcom::Rc<IDirect3DVertexBuffer9>,
-        quad_vdecl: mcom::Rc<IDirect3DVertexDeclaration9>,
+        corner_quads_ib:    mcom::Rc<IDirect3DIndexBuffer9>,
     }
 
     impl From<mcom::Rc<IDirect3DDevice9>> for Data9 {
         fn from(device: mcom::Rc<IDirect3DDevice9>) -> Self {
-            let quad_ib = unsafe { device.create_index_buffer_from(0, D3DPOOL_DEFAULT, &[0u16, 1, 2, 0, 2, 3]) }.unwrap();
-            let (quad_vb, quad_vdecl) = unsafe { device.create_vertex_buffer_decl_from(0, D3DPOOL_DEFAULT, &[
-                Vertex { position: [-0.5,  0.5, 0.0, 1.0], texcoord: [0.0, 0.0] },
-                Vertex { position: [ 0.5,  0.5, 0.0, 1.0], texcoord: [1.0, 0.0] },
-                Vertex { position: [ 0.5, -0.5, 0.0, 1.0], texcoord: [1.0, 1.0] },
-                Vertex { position: [-0.5, -0.5, 0.0, 1.0], texcoord: [0.0, 1.0] },
+            let corner_quads_ib = unsafe { device.create_index_buffer_from::<u16>(0, D3DPOOL_DEFAULT, &[
+                 0, 1, 2, 0, 2, 3,
+                 4, 5, 6, 4, 6, 7,
+                 8, 9,10, 8,10,11,
+                12,13,14,12,14,15,
             ])}.unwrap();
-            Self { quad_ib, quad_vb, quad_vdecl }
+            Self { corner_quads_ib }
         }
     }
 
@@ -66,20 +63,53 @@
             return false;
         } else {
             if let (Some(data), Some(mwc9)) = (mwc9.per_device::<Data9>(), mwc9.lock(false)) {
-                for window in mwc9.windows.iter() {
-                    let tc = d3d9::BasicTextureCache::get(&mwc9.device);
-                    let _d3d_16x9 = tc.get_texture_2d_static_file(include_bytes!("d3d-16x9.png"));
+                let dev = &mwc9.device;
+                let tc = d3d9::BasicTextureCache::get(dev);
+                let d3d_logo_16x9 = tc.get_texture_2d_static_file(include_bytes!("d3d-16x9.png"));
 
-                    unsafe { window.bind(&mwc9.device) }.unwrap();
-                    let _hr = unsafe { mwc9.device.Clear(0, null(), D3DCLEAR_TARGET, 0xFF112233, 0.0, 0) };
-                    let _hr = unsafe { mwc9.device.BeginScene() };
-                    let _hr = unsafe { mwc9.device.SetRenderState(D3DRS_LIGHTING, false.into()) };
-                    let _hr = unsafe { mwc9.device.SetIndices(data.quad_ib.as_ptr()) };
-                    let _hr = unsafe { mwc9.device.SetVertexDeclaration(data.quad_vdecl.as_ptr()) };
-                    let _hr = unsafe { mwc9.device.SetStreamSource(0, data.quad_vb.as_ptr(), 0, std::mem::size_of::<Vertex>() as u32) };
-                    let _hr = unsafe { mwc9.device.SetTexture(0, _d3d_16x9.up_ref().as_ptr()) };
-                    let _hr = unsafe { mwc9.device.DrawIndexedPrimitive(D3DPT_TRIANGLELIST, 0, 0, 4, 0, 2) };
-                    let _hr = unsafe { mwc9.device.EndScene() };
+                for window in mwc9.windows.iter() {
+                    let (cw, ch) = window.client_size();
+                    let two_cw =  2.0 / (cw as f32);
+                    let two_ch = -2.0 / (ch as f32);
+                    let pos = |x: u32, y: u32| -> [f32; 4] {[
+                        ((x as f32 - 0.5) * two_cw) - 1.0,
+                        ((y as f32 - 0.5) * two_ch) + 1.0,
+                        0.0,
+                        1.0,
+                    ]};
+
+                    let (corner_quads_vb, corner_quads_vdecl) = unsafe { dev.create_vertex_buffer_decl_from(0, D3DPOOL_DEFAULT, &[
+                        Vertex { position: pos(10 +  0, 10 + 0), texcoord: [0.0, 0.0] },
+                        Vertex { position: pos(10 + 16, 10 + 0), texcoord: [1.0, 0.0] },
+                        Vertex { position: pos(10 + 16, 10 + 9), texcoord: [1.0, 1.0] },
+                        Vertex { position: pos(10 +  0, 10 + 9), texcoord: [0.0, 1.0] },
+
+                        Vertex { position: pos(cw - 26 +  0, 10 + 0), texcoord: [0.0, 0.0] },
+                        Vertex { position: pos(cw - 26 + 16, 10 + 0), texcoord: [1.0, 0.0] },
+                        Vertex { position: pos(cw - 26 + 16, 10 + 9), texcoord: [1.0, 1.0] },
+                        Vertex { position: pos(cw - 26 +  0, 10 + 9), texcoord: [0.0, 1.0] },
+
+                        Vertex { position: pos(cw - 26 +  0, ch - 19 + 0), texcoord: [0.0, 0.0] },
+                        Vertex { position: pos(cw - 26 + 16, ch - 19 + 0), texcoord: [1.0, 0.0] },
+                        Vertex { position: pos(cw - 26 + 16, ch - 19 + 9), texcoord: [1.0, 1.0] },
+                        Vertex { position: pos(cw - 26 +  0, ch - 19 + 9), texcoord: [0.0, 1.0] },
+
+                        Vertex { position: pos(10 +  0, ch - 19 + 0), texcoord: [0.0, 0.0] },
+                        Vertex { position: pos(10 + 16, ch - 19 + 0), texcoord: [1.0, 0.0] },
+                        Vertex { position: pos(10 + 16, ch - 19 + 9), texcoord: [1.0, 1.0] },
+                        Vertex { position: pos(10 +  0, ch - 19 + 9), texcoord: [0.0, 1.0] },
+                    ])}.unwrap();
+
+                    unsafe { window.bind(dev) }.unwrap();
+                    let _hr = unsafe { dev.Clear(0, null(), D3DCLEAR_TARGET, 0xFF112233, 0.0, 0) };
+                    let _hr = unsafe { dev.BeginScene() };
+                    let _hr = unsafe { dev.SetRenderState(D3DRS_LIGHTING, false.into()) };
+                    let _hr = unsafe { dev.SetIndices(data.corner_quads_ib.as_ptr()) };
+                    let _hr = unsafe { dev.SetVertexDeclaration(corner_quads_vdecl.as_ptr()) };
+                    let _hr = unsafe { dev.SetStreamSource(0, corner_quads_vb.as_ptr(), 0, std::mem::size_of::<Vertex>() as u32) };
+                    let _hr = unsafe { dev.SetTexture(0, d3d_logo_16x9.up_ref().as_ptr()) };
+                    let _hr = unsafe { dev.DrawIndexedPrimitive(D3DPT_TRIANGLELIST, 0, 0, 4*4, 0, 4*2) };
+                    let _hr = unsafe { dev.EndScene() };
                     let _hr = unsafe { window.swap_chain.Present(null(), null(), null_mut(), null(), 0) };
                     // XXX: error checking?
                 }
