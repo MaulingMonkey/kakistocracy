@@ -1,5 +1,5 @@
 use crate::windows::Error;
-use crate::windows::d3d9::Index;
+use crate::windows::d3d9::{Index, Vertex};
 
 use mcom::AsIUnknown;
 use winapi::Interface;
@@ -17,6 +17,11 @@ use std::ptr::*;
 pub trait D3d9DeviceExt {
     fn get_back_buffer(&self, swap_chain: u32, back_buffer: u32) -> Result<mcom::Rc<IDirect3DSurface9>, Error>;
     unsafe fn create_index_buffer_from<I: Index>(&self, usage: DWORD, pool: D3DPOOL, data: &[I]) -> Result<mcom::Rc<IDirect3DIndexBuffer9>, Error>;
+    unsafe fn create_vertex_buffer_from<V: Vertex>(&self, usage: DWORD, pool: D3DPOOL, data: &[V]) -> Result<mcom::Rc<IDirect3DVertexBuffer9>, Error>;
+    unsafe fn create_vertex_decl_from<V: Vertex>(&self) -> Result<mcom::Rc<IDirect3DVertexDeclaration9>, Error>;
+    unsafe fn create_vertex_buffer_decl_from<V: Vertex>(&self, usage: DWORD, pool: D3DPOOL, data: &[V]) -> Result<(mcom::Rc<IDirect3DVertexBuffer9>, mcom::Rc<IDirect3DVertexDeclaration9>), Error> {
+        Ok((self.create_vertex_buffer_from(usage, pool, data)?, self.create_vertex_decl_from::<V>()?))
+    }
 }
 
 pub trait D3d9SwapChainExt {
@@ -70,6 +75,46 @@ impl D3d9DeviceExt for mcom::Rc<IDirect3DDevice9> {
         Error::check_hr("IDirect3DIndexBuffer9::Unlock", hr, "")?;
 
         Ok(ib)
+    }
+
+    unsafe fn create_vertex_buffer_from<V: Vertex>(&self, usage: DWORD, pool: D3DPOOL, data: &[V]) -> Result<mcom::Rc<IDirect3DVertexBuffer9>, Error> {
+        let size : UINT = std::mem::size_of_val(data).try_into().map_err(|_| Error::new("mcom::Rc<IDirect3DDevice9>::create_vertex_buffer_decl_from", "", 0, "size_of_val(data) exceeded UINT"))?;
+        let mut vb = null_mut();
+        let hr = self.CreateVertexBuffer(size, usage, 0, pool, &mut vb, null_mut());
+        let vb = mcom::Rc::from_raw_opt(vb).ok_or(Error::new_hr("IDirect3DDevice9::CreateVertexBuffer", hr, "IDirect3DVertexBuffer9 is null"))?;
+
+        let mut lock = null_mut();
+        let hr = vb.Lock(0, 0, &mut lock, 0);
+        Error::check_hr("IDirect3DVertexBuffer9::Lock", hr, "")?;
+
+        std::ptr::copy_nonoverlapping(data.as_ptr(), lock as *mut V, data.len());
+
+        let hr = vb.Unlock();
+        Error::check_hr("IDirect3DVertexBuffer9::Unlock", hr, "")?;
+
+        Ok(vb)
+    }
+
+    unsafe fn create_vertex_decl_from<V: Vertex>(&self) -> Result<mcom::Rc<IDirect3DVertexDeclaration9>, Error> {
+        let elements = V::elements();
+        let elements = elements.as_ref();
+        if elements.is_empty() { return Err(Error::new("mcom::Rc<IDirect3DDevice9>::create_vertex_decl_from", "", 0, "elements is empty")) }
+        let (mid, end) = elements.split_at(elements.len()-1);
+        for mid in mid.iter() { if  eq(mid, &D3DDECL_END) { return Err(Error::new("mcom::Rc<IDirect3DDevice9>::create_vertex_decl_from", "", 0, "V::elements() contains non-terminal D3DDECL_END")) } }
+        for end in end.iter() { if !eq(end, &D3DDECL_END) { return Err(Error::new("mcom::Rc<IDirect3DDevice9>::create_vertex_decl_from", "", 0, "V::elements() does not end with D3DDECL_END")) } }
+
+        fn eq(a: &D3DVERTEXELEMENT9, b: &D3DVERTEXELEMENT9) -> bool {
+            (a.Method == b.Method) &&
+            (a.Offset == b.Offset) &&
+            (a.Stream == b.Stream) &&
+            (a.Type   == b.Type  ) &&
+            (a.Usage  == b.Usage ) &&
+            (a.UsageIndex == b.UsageIndex)
+        }
+
+        let mut vd = null_mut();
+        let hr = self.CreateVertexDeclaration(elements.as_ptr(), &mut vd);
+        mcom::Rc::from_raw_opt(vd).ok_or(Error::new_hr("IDirect3DDevice9::CreateVertexDeclaration", hr, "IDirect3DVertexDeclaration9 is null"))
     }
 }
 
