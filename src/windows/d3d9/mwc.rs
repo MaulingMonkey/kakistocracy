@@ -149,29 +149,28 @@ impl MultiWindowContext {
 
 impl MultiWindowContextLockWindow {
     /// Binds the next back buffer of the window's swap chain as the render target, and sets the viewport to the entire window.
-    ///
-    /// ### Safety
-    /// * `device` must be the same device as the originating [`MultiWindowContext`]
-    pub unsafe fn bind(&self, device: &mcom::Rc<IDirect3DDevice9>) -> Result<(), Error> {
-        let mut bb = null_mut();
-        let hr = self.swap_chain.GetBackBuffer(0, D3DBACKBUFFER_TYPE_MONO, &mut bb);
-        let bb = mcom::Rc::from_raw_opt(bb).ok_or(Error::new_hr("IDirect3DSwapChain9::GetBackBuffer", hr, "IDirect3DSurface9 is null"))?;
+    pub fn bind(&self) -> Result<(), Error> {
+        let device = &self.device;
 
-        let mut desc = std::mem::zeroed();
-        let hr = bb.GetDesc(&mut desc);
+        let mut bb = null_mut();
+        let hr = unsafe { self.swap_chain.GetBackBuffer(0, D3DBACKBUFFER_TYPE_MONO, &mut bb) };
+        let bb = unsafe { mcom::Rc::from_raw_opt(bb) }.ok_or(Error::new_hr("IDirect3DSwapChain9::GetBackBuffer", hr, "IDirect3DSurface9 is null"))?;
+
+        let mut desc = unsafe { std::mem::zeroed() };
+        let hr = unsafe { bb.GetDesc(&mut desc) };
         if !SUCCEEDED(hr) { return Err(Error::new_hr("IDirect3DSurface9::GetDesc", hr, "when binding MultiWindowContextLockWindow")); }
 
-        let hr = device.SetRenderTarget(0, bb.as_ptr());
+        let hr = unsafe { device.SetRenderTarget(0, bb.as_ptr()) };
         if !SUCCEEDED(hr) { return Err(Error::new_hr("IDirect3DDevice9::SetRenderTarget", hr, "when binding MultiWindowContextLockWindow")); }
 
-        let hr = device.SetViewport(&D3DVIEWPORT9 {
+        let hr = unsafe { device.SetViewport(&D3DVIEWPORT9 {
             X:      0,
             Y:      0,
             Width:  desc.Width,
             Height: desc.Height,
             MinZ:   0.0,
             MaxZ:   1.0,
-        });
+        })};
         if !SUCCEEDED(hr) { return Err(Error::new_hr("IDirect3DDevice9::SetViewport", hr, "when binding MultiWindowContextLockWindow")); }
 
         Ok(())

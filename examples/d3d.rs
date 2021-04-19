@@ -100,7 +100,7 @@
                         Vertex { position: pos(10 +  0, ch - 19 + 9), texcoord: [0.0, 1.0] },
                     ])}.unwrap();
 
-                    unsafe { window.bind(dev) }.unwrap();
+                    window.bind().unwrap();
                     let _hr = unsafe { dev.Clear(0, null(), D3DCLEAR_TARGET, 0xFF112233, 0.0, 0) };
                     let _hr = unsafe { dev.BeginScene() };
                     let _hr = unsafe { dev.SetRenderState(D3DRS_LIGHTING, false.into()) };
