@@ -7,16 +7,24 @@ use std::ptr::*;
 
 
 
-pub trait D3d11DeviceExt {
+/// Extension methods for [`ID3D11Device`](https://docs.microsoft.com/en-us/windows/win32/api/d3d11/nn-d3d11-id3d11device)
+pub trait ID3D11DeviceExt {
+    /// <code>[IUnknown::QueryInterface](https://docs.microsoft.com/en-us/windows/win32/api/unknwn/nf-unknwn-iunknown-queryinterface(refiid_void))(__uuidof([IDXGIDevice](https://docs.microsoft.com/en-us/windows/win32/api/dxgi/nn-dxgi-idxgidevice)), ...)</code>
     fn to_dxgi_device(&self) -> mcom::Rc<IDXGIDevice>;
+
+    /// [`ID3D11Device::CreateRenderTargetView`](https://docs.microsoft.com/en-us/windows/win32/api/d3d11/nf-d3d11-id3d11device-createrendertargetview)
     fn create_render_target_view_from_resource(&self, resource: &mcom::Rc<ID3D11Resource>) -> Result<mcom::Rc<ID3D11RenderTargetView>, Error>;
+
+    /// [`ID3D11Device::CreateRenderTargetView`](https://docs.microsoft.com/en-us/windows/win32/api/d3d11/nf-d3d11-id3d11device-createrendertargetview)
+    ///
     /// ### Safety
-    /// * `format` should be a valid format?
-    /// * `mip_slice` should be a valid mip slice?
+    /// Undefined behavior might result unless:
+    /// * `format` is a valid format
+    /// * `mip_slice` is a valid mip slice
     unsafe fn create_render_target_view_from_texture2d(&self, texture: &mcom::Rc<ID3D11Texture2D>, format: u32, mip_slice: u32) -> Result<mcom::Rc<ID3D11RenderTargetView>, Error>;
 }
 
-impl D3d11DeviceExt for mcom::Rc<ID3D11Device> {
+impl ID3D11DeviceExt for mcom::Rc<ID3D11Device> {
     fn to_dxgi_device(&self) -> mcom::Rc<IDXGIDevice> {
         self.try_cast::<IDXGIDevice>().unwrap()
     }

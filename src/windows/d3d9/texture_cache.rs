@@ -30,7 +30,7 @@ pub struct BasicTextureCache {
 impl BasicTextureCache {
     pub fn get(device: &mcom::Rc<IDirect3DDevice9>) -> impl Deref<Target = Self> {
         let pdguid = type_guid::<Self>();
-        let bb = device.get_back_buffer(0, 0).unwrap();
+        let bb = unsafe { device.get_back_buffer(0, 0) }.unwrap();
         match unsafe { bb.get_private_data_com::<IUnknown>(&pdguid) } {
             Ok(btc) => UnkWrapRc::from_com_unknown(&btc).unwrap(),
             Err(err) if err.hresult() == D3DERR_NOTFOUND => {
