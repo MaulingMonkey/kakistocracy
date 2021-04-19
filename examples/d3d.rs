@@ -69,14 +69,8 @@
 
                 for window in mwc9.windows.iter() {
                     let (cw, ch) = window.client_size();
-                    let two_cw =  2.0 / (cw as f32);
-                    let two_ch = -2.0 / (ch as f32);
-                    let pos = |x: u32, y: u32| -> [f32; 4] {[
-                        ((x as f32 - 0.5) * two_cw) - 1.0,
-                        ((y as f32 - 0.5) * two_ch) + 1.0,
-                        0.0,
-                        1.0,
-                    ]};
+                    let (sx, sy) = (2.0 / (cw as f32), -2.0 / (ch as f32));
+                    let pos = |x: u32, y: u32| [((x as f32 - 0.5) * sx) - 1.0, ((y as f32 - 0.5) * sy) + 1.0, 0.0, 1.0];
 
                     let (corner_quads_vb, corner_quads_vdecl) = unsafe { dev.create_vertex_buffer_decl_from(0, D3DPOOL_DEFAULT, &[
                         Vertex { position: pos(10 +  0, 10 + 0), texcoord: [0.0, 0.0] },
