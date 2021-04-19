@@ -73,6 +73,7 @@ features = [
     # um
     "errhandlingapi",
     "libloaderapi",
+    "processthreadsapi",
     "unknwnbase",
     "winuser",
 ]

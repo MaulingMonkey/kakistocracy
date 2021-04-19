@@ -6,6 +6,7 @@ use wchar::wch_c;
 
 use winapi::shared::minwindef::*;
 use winapi::shared::windef::*;
+use winapi::um::processthreadsapi::*;
 use winapi::um::winuser::*;
 
 use std::any::{Any, TypeId};
@@ -340,6 +341,37 @@ unsafe fn register_class_w(wndclass: &WNDCLASSW) -> Result<ATOM, Error> {
     } else {
         Error::last("RegisterClassW", "")
     }
+}
+
+/// [`EnumWindows`](https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-enumwindows)
+#[allow(dead_code)]
+fn enum_windows<F: FnMut(HWND) -> bool>(mut f: F) -> bool {
+    unsafe extern "system" fn imp<F: FnMut(HWND) -> bool>(hwnd: HWND, lparam: LPARAM) -> BOOL {
+        let f = &mut *(lparam as *mut F);
+        f(hwnd).into()
+    }
+    let f : *mut F = &mut f;
+    unsafe { EnumWindows(Some(imp::<F>), f as LPARAM) != 0 }
+}
+
+/// [`EnumThreadWindows`](https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-enumthreadwindows)
+fn enum_thread_windows<F: FnMut(HWND) -> bool>(dw_thread_id: DWORD, mut f: F) -> bool {
+    unsafe extern "system" fn imp<F: FnMut(HWND) -> bool>(hwnd: HWND, lparam: LPARAM) -> BOOL {
+        let f = &mut *(lparam as *mut F);
+        f(hwnd).into()
+    }
+    let f : *mut F = &mut f;
+    unsafe { EnumThreadWindows(dw_thread_id, Some(imp::<F>), f as LPARAM) != 0 }
+}
+
+pub fn any_current_thread_windows() -> bool {
+    let mut any = false;
+    let thread = unsafe { GetCurrentThreadId() };
+    enum_thread_windows(thread, |_hwnd| {
+        any = true;
+        false
+    });
+    any
 }
 
 #[allow(non_snake_case)] pub(crate) fn MAKEINTATOMW(atom: ATOM) -> *const u16 {
