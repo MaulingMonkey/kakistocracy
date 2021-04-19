@@ -1,6 +1,7 @@
 use crate::windows::*;
 
 use winapi::shared::d3d9::*;
+use winapi::shared::d3d9caps::*;
 use winapi::shared::d3d9types::*;
 use winapi::shared::winerror::SUCCEEDED;
 
@@ -128,6 +129,7 @@ impl MultiWindowContext {
                     *wa_swap_chain = None; // release previous swap chain before creating a new one
                     let mut swap_chain = null_mut();
                     let mut pp = unsafe { d3d9::default_windowed_presentation_parameters(hwnd) };
+                    pp.PresentationInterval = D3DPRESENT_INTERVAL_IMMEDIATE;
                     let _hr = unsafe { dac.device.CreateAdditionalSwapChain(&mut pp, &mut swap_chain) };
                     let swap_chain = unsafe { mcom::Rc::from_raw_opt(swap_chain)? }; // panic on null?
                     *wa_swap_chain = Some(swap_chain.clone());

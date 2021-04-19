@@ -3,6 +3,7 @@
 #[cfg(not(windows))] fn main() {}
 
 #[cfg(windows)] fn main() {
+    use kakistocracy::utility::FrameRateCounter;
     use kakistocracy::windows::*;
     use kakistocracy::windows::winapi::shared::d3d9::*;
     use kakistocracy::windows::winapi::shared::d3d9types::*;
@@ -45,6 +46,7 @@
 
 
 
+    let mut frc = FrameRateCounter::new(1);
     let mut mwc9 = d3d9::MultiWindowContext::new().unwrap();
     let mut mwc11 = d3d11::MultiWindowContext::new().unwrap();
 
@@ -107,18 +109,21 @@
                     let _hr = unsafe { window.swap_chain.Present(null(), null(), null_mut(), null(), 0) };
                     // XXX: error checking?
                 }
+
+                //let _hr = unsafe { dev.Present(null(), null(), null_mut(), null()) };
             }
 
             if let Some(mwc11) = mwc11.lock(false) {
                 for window in mwc11.windows.iter() {
                     unsafe { window.bind(&mwc11.immediate_context) }.unwrap();
                     unsafe { mwc11.immediate_context.ClearRenderTargetView(window.rtv.as_ptr(), &[0.3, 0.2, 0.1, 1.0]) };
-                    unsafe { window.swap_chain.Present(1, 0) };
+                    unsafe { window.swap_chain.Present(0, 0) };
                     // XXX: error checking?
                 }
             }
 
             // XXX: if different windows have different refresh rates, should D3DPRESENT_DONOTWAIT be attempted first?
+            println!("{:.02?}", frc.frame());
         }
         true
     });
