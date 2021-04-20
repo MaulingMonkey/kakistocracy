@@ -3,6 +3,7 @@
 #[cfg(not(windows))] fn main() {}
 
 #[cfg(windows)] fn main() {
+    use kakistocracy::*;
     use kakistocracy::windows::*;
     use kakistocracy::windows::winapi::shared::d3d9::*;
     use kakistocracy::windows::winapi::shared::d3d9types::*;
@@ -63,7 +64,7 @@
         if let (Some(data), Some(mwc9)) = (mwc9.per_device::<Data9>(), mwc9.lock(false)) {
             let dev = &mwc9.device;
             let tc = d3d9::BasicTextureCache::get(dev);
-            let d3d_logo_16x9 = tc.get_texture_2d_static_file(include_bytes!("d3d-16x9.png"));
+            let d3d_logo_16x9 = tc.get_texture_2d_static_file(include_file!("d3d-16x9.png").data);
 
             for window in mwc9.windows.iter() {
                 let (cw, ch) = window.client_size();
