@@ -230,3 +230,19 @@ impl IDirect3DResource9Ext for mcom::Rc<IDirect3DSurface9> {
     unsafe fn get_private_data_com<I: Interface>(&self, guid: &GUID) -> Result<mcom::Rc<I>, Error> { self.up_ref().get_private_data_com(guid) }
     fn set_private_data_com<I: Interface>(&self, guid: &GUID, data: &mcom::Rc<I>) -> Result<(), Error> { self.up_ref().set_private_data_com(guid, data) }
 }
+
+impl IDirect3DResource9Ext for mcom::Rc<IDirect3DBaseTexture9> {
+    fn free_private_data(&self, guid: &GUID) -> Result<(), Error> { self.up_ref().free_private_data(guid) }
+    fn get_private_data_raw<'d>(&self, guid: &GUID, data: &'d mut [u8]) -> Result<&'d [u8], Error> { self.up_ref().get_private_data_raw(guid, data) }
+    fn set_private_data_raw    (&self, guid: &GUID, data: &       [u8]) -> Result<(),       Error> { self.up_ref().set_private_data_raw(guid, data) }
+    unsafe fn get_private_data_com<I: Interface>(&self, guid: &GUID) -> Result<mcom::Rc<I>, Error> { self.up_ref().get_private_data_com(guid) }
+    fn set_private_data_com<I: Interface>(&self, guid: &GUID, data: &mcom::Rc<I>) -> Result<(), Error> { self.up_ref().set_private_data_com(guid, data) }
+}
+
+impl IDirect3DResource9Ext for mcom::Rc<IDirect3DTexture9> {
+    fn free_private_data(&self, guid: &GUID) -> Result<(), Error> { self.up_ref().free_private_data(guid) }
+    fn get_private_data_raw<'d>(&self, guid: &GUID, data: &'d mut [u8]) -> Result<&'d [u8], Error> { self.up_ref().get_private_data_raw(guid, data) }
+    fn set_private_data_raw    (&self, guid: &GUID, data: &       [u8]) -> Result<(),       Error> { self.up_ref().set_private_data_raw(guid, data) }
+    unsafe fn get_private_data_com<I: Interface>(&self, guid: &GUID) -> Result<mcom::Rc<I>, Error> { self.up_ref().get_private_data_com(guid) }
+    fn set_private_data_com<I: Interface>(&self, guid: &GUID, data: &mcom::Rc<I>) -> Result<(), Error> { self.up_ref().set_private_data_com(guid, data) }
+}

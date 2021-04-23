@@ -1,11 +1,16 @@
 use crate::windows::*;
+use crate::windows::d3d9::D3DERR_NOTFOUND;
 
 use winapi::shared::d3d9::*;
 use winapi::shared::d3d9caps::*;
 use winapi::shared::d3d9types::*;
 use winapi::shared::minwindef::*;
 use winapi::shared::windef::*;
+use winapi::um::unknwnbase::IUnknown;
 
+use std::any::Any;
+use std::marker::PhantomData;
+use std::ops::*;
 use std::ptr::null_mut;
 
 
@@ -38,6 +43,21 @@ pub unsafe fn create_device_ex_windowed(d3d: &mcom::Rc<IDirect3D9Ex>, window: &W
     let mut device = null_mut();
     let hr = d3d.CreateDeviceEx(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, null_mut(), DEFAULT_BEHAVIOR_FLAGS, &mut pp, null_mut(), &mut device);
     mcom::Rc::from_raw_opt(device).ok_or(Error::new_hr("IDirect3D9Ex::CreateDeviceEx", hr, "IDirect3DDevice9Ex is null"))
+}
+
+pub(crate) fn device_private_data_get_or_insert<T: Any>(device: &mcom::Rc<IDirect3DDevice9>, f: impl FnOnce() -> T) -> UnkWrapRc<T> {
+    struct DevicePrivateData<T: Any>(PhantomData<T>);
+    let pdguid = type_guid::<DevicePrivateData::<T>>();
+    let bb = unsafe { device.get_back_buffer(0, 0) }.unwrap();
+    match unsafe { bb.get_private_data_com::<IUnknown>(&pdguid) } {
+        Ok(btc) => UnkWrapRc::from_com_unknown(&btc).unwrap(),
+        Err(err) if err.hresult() == D3DERR_NOTFOUND => {
+            let btc = UnkWrapRc::new(f());
+            bb.set_private_data_com(&pdguid, &btc.to_com_unknown()).unwrap();
+            btc
+        },
+        Err(err) => panic!("{}", err),
+    }
 }
 
 

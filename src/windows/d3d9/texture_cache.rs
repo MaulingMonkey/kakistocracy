@@ -1,10 +1,9 @@
-use crate::utility::StaticBytesRef;
+use crate::utility::{StaticBytesRef, StaticFile};
 use crate::windows::*;
 
 use winapi::shared::d3d9::*;
 use winapi::shared::d3d9types::*;
-use winapi::shared::winerror::HRESULT;
-use winapi::um::unknwnbase::IUnknown;
+use winapi::um::d3dcommon::WKPDID_D3DDebugObjectName;
 
 use std::borrow::Cow;
 use std::cell::RefCell;
@@ -29,17 +28,7 @@ pub struct BasicTextureCache {
 
 impl BasicTextureCache {
     pub fn get(device: &mcom::Rc<IDirect3DDevice9>) -> impl Deref<Target = Self> {
-        let pdguid = type_guid::<Self>();
-        let bb = unsafe { device.get_back_buffer(0, 0) }.unwrap();
-        match unsafe { bb.get_private_data_com::<IUnknown>(&pdguid) } {
-            Ok(btc) => UnkWrapRc::from_com_unknown(&btc).unwrap(),
-            Err(err) if err.hresult() == D3DERR_NOTFOUND => {
-                let btc = UnkWrapRc::new(Self::new(device.clone()));
-                bb.set_private_data_com(&pdguid, &btc.to_com_unknown()).unwrap();
-                btc
-            },
-            Err(err) => panic!("{}", err),
-        }
+        d3d9::device_private_data_get_or_insert(device, || BasicTextureCache::new(device.clone()))
     }
 
     pub fn new(device: mcom::Rc<IDirect3DDevice9>) -> Self {
@@ -54,10 +43,10 @@ impl BasicTextureCache {
         }
     }
 
-    pub fn get_texture_2d_static_file(&self, bytes: &'static [u8]) -> mcom::Rc<IDirect3DTexture9> {
+    pub fn get_texture_2d_static_file(&self, file: &StaticFile) -> mcom::Rc<IDirect3DTexture9> {
         let mut static_files = self.static_files.borrow_mut();
-        let entry = static_files.entry(StaticBytesRef(bytes)).or_insert_with(||
-            self.entry_2d_file_bytes(bytes).unwrap_or_else(|err| Entry2D {
+        let entry = static_files.entry(StaticBytesRef(file.data)).or_insert_with(||
+            self.create_entry_2d_bytes_debug_name(file.data, file.path).unwrap_or_else(|err| Entry2D {
                 texture:    self.placeholder_2d_error.clone(),
                 error:      Some(err),
             })
@@ -70,7 +59,7 @@ impl BasicTextureCache {
         let entry = dynamic_files.entry(Cow::Borrowed(path)).or_insert_with(|| {
             let mut last_mod_time = SystemTime::UNIX_EPOCH;
             let bytes = match Self::read_bytes_mod(path, &mut last_mod_time) { Ok(b) => b, Err(err) => { return Dynamic { common: self.entry_io_error(err), last_mod_time } }, };
-            let common = self.entry_2d_file_bytes(&bytes[..]).unwrap_or_else(|err| Entry2D { texture: self.placeholder_2d_error.clone(), error: Some(err) });
+            let common = self.create_entry_2d_bytes_debug_name(&bytes[..], &path.to_string_lossy()).unwrap_or_else(|err| Entry2D { texture: self.placeholder_2d_error.clone(), error: Some(err) });
             Dynamic { common, last_mod_time }
         });
         entry.common.texture.clone()
@@ -95,7 +84,7 @@ impl BasicTextureCache {
         }
     }
 
-    fn entry_2d_file_bytes(&self, bytes: &[u8]) -> Result<Entry2D, Box<dyn std::error::Error>> {
+    fn create_entry_2d_bytes_debug_name(&self, bytes: &[u8], _debug_name: &str) -> Result<Entry2D, Box<dyn std::error::Error>> {
         let mut decoder = png::Decoder::new(bytes);
         decoder.set_transformations(
             // png::ColorType::* is in native (little) endian
@@ -156,6 +145,8 @@ impl BasicTextureCache {
         let hr = unsafe { tex.UnlockRect(0) };
         Error::check_hr("IDirect3DTexture9::UnlockRect", hr, "")?;
 
+        let _ = tex.set_private_data_raw(&WKPDID_D3DDebugObjectName, _debug_name.as_bytes());
+
         Ok(Entry2D { texture: tex, error: None })
     }
 }
@@ -199,10 +190,3 @@ fn create_texture_rgba_1x1(device: &mcom::Rc<IDirect3DDevice9>, rgba: u32) -> Re
 
     Ok(tex)
 }
-
-
-const D3DERR_NOTFOUND : HRESULT = MAKE_D3DHRESULT(2150);
-
-const _FACD3D : u16 = 0x876;
-#[allow(non_snake_case)] const fn MAKE_D3DHRESULT(code: u16) -> HRESULT { error::MAKE_HRESULT(1, _FACD3D, code) }
-//#[allow(non_snake_case)] const fn MAKE_D3DSTATUS (code: u16) -> HRESULT { error::MAKE_HRESULT(0, _FACD3D, code) }

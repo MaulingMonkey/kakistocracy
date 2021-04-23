@@ -35,7 +35,7 @@ unsafe impl Index for u32 { fn d3dfmt() -> D3DFORMAT { D3DFMT_INDEX32 } }
 ///
 /// [`IDirect3DVertexBuffer9`]:         https://docs.microsoft.com/en-us/windows/win32/api/d3d9helper/nn-d3d9helper-idirect3dvertexbuffer9
 /// [`IDirect3DVertexDeclaration9`]:    https://docs.microsoft.com/en-us/windows/win32/api/d3d9helper/nn-d3d9helper-idirect3dvertexdeclaration9
-pub unsafe trait Vertex {
+pub unsafe trait Vertex : Sized {
     type Decl : AsRef<[D3DVERTEXELEMENT9]>;
 
     /// Returns an array or vec of [`D3DVERTEXELEMENT9`]s, ending with [`D3DDECL_END`], suitable for passing to [`IDirect3DDevice9::CreateVertexDeclaration`].
@@ -44,4 +44,7 @@ pub unsafe trait Vertex {
     /// [`D3DDECL_END`]:                                https://docs.microsoft.com/en-us/windows/win32/direct3d9/d3ddecl-end
     /// [`IDirect3DDevice9::CreateVertexDeclaration`]:  https://docs.microsoft.com/en-us/windows/win32/api/d3d9helper/nf-d3d9helper-idirect3ddevice9-createvertexdeclaration
     fn elements() -> Self::Decl;
+
+    /// Returns the stride of a given vertex.
+    fn stride() -> u32 { std::mem::size_of::<Self>() as _ }
 }
