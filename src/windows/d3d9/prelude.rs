@@ -1,3 +1,5 @@
+//! [IDirect3DDevice9Ext], [IDirect3DSwapChain9Ext], [IDirect3DResource9Ext], ...
+
 use crate::windows::Error;
 use crate::windows::d3d9::{Index, Vertex};
 
