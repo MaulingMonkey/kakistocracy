@@ -9,6 +9,7 @@ use winapi::shared::d3d9::*;
 use winapi::shared::d3d9types::*;
 use winapi::shared::guiddef::GUID;
 use winapi::shared::minwindef::{DWORD, UINT};
+use winapi::um::d3dcommon::WKPDID_D3DDebugObjectName;
 use winapi::um::unknwnbase::IUnknown;
 
 use std::convert::*;
@@ -37,7 +38,7 @@ pub trait IDirect3DDevice9Ext {
     ///     * Running out of memory may result in UB
     ///     * Running out of address space may result in UB
     ///     * Overflowing D3D-internal u32s based on the length of `data` may result in UB
-    unsafe fn create_index_buffer_from<I: Index>(&self, usage: DWORD, pool: D3DPOOL, data: &[I]) -> Result<mcom::Rc<IDirect3DIndexBuffer9>, Error>;
+    unsafe fn create_index_buffer_from<I: Index>(&self, usage: DWORD, pool: D3DPOOL, data: &[I], _debug_name: &str) -> Result<mcom::Rc<IDirect3DIndexBuffer9>, Error>;
 
     /// [`IDirect3DDevice9::CreateVertexBuffer`](https://docs.microsoft.com/en-us/windows/win32/api/d3d9/nf-d3d9-idirect3ddevice9-createvertexbuffer)
     /// + `Lock` + `memcpy` + `Unlock`
@@ -50,7 +51,7 @@ pub trait IDirect3DDevice9Ext {
     ///     * Running out of memory may result in UB
     ///     * Running out of address space may result in UB
     ///     * Overflowing D3D-internal u32s based on the length of `data` may result in UB
-    unsafe fn create_vertex_buffer_from<V: Vertex>(&self, usage: DWORD, pool: D3DPOOL, data: &[V]) -> Result<mcom::Rc<IDirect3DVertexBuffer9>, Error>;
+    unsafe fn create_vertex_buffer_from<V: Vertex>(&self, usage: DWORD, pool: D3DPOOL, data: &[V], _debug_name: &str) -> Result<mcom::Rc<IDirect3DVertexBuffer9>, Error>;
 
     /// [`IDirect3DDevice9::CreateVertexDeclaration`](https://docs.microsoft.com/en-us/windows/win32/api/d3d9/nf-d3d9-idirect3ddevice9-createvertexdeclaration)
     fn create_vertex_decl_from<V: Vertex>(&self) -> Result<mcom::Rc<IDirect3DVertexDeclaration9>, Error>;
@@ -67,8 +68,8 @@ pub trait IDirect3DDevice9Ext {
     ///     * Running out of memory may result in UB
     ///     * Running out of address space may result in UB
     ///     * Overflowing D3D-internal u32s based on the length of `data` may result in UB
-    unsafe fn create_vertex_buffer_decl_from<V: Vertex>(&self, usage: DWORD, pool: D3DPOOL, data: &[V]) -> Result<(mcom::Rc<IDirect3DVertexBuffer9>, mcom::Rc<IDirect3DVertexDeclaration9>), Error> {
-        Ok((self.create_vertex_buffer_from(usage, pool, data)?, self.create_vertex_decl_from::<V>()?))
+    unsafe fn create_vertex_buffer_decl_from<V: Vertex>(&self, usage: DWORD, pool: D3DPOOL, data: &[V], _debug_name: &str) -> Result<(mcom::Rc<IDirect3DVertexBuffer9>, mcom::Rc<IDirect3DVertexDeclaration9>), Error> {
+        Ok((self.create_vertex_buffer_from(usage, pool, data, _debug_name)?, self.create_vertex_decl_from::<V>()?))
     }
 }
 
@@ -114,7 +115,7 @@ impl IDirect3DDevice9Ext for mcom::Rc<IDirect3DDevice9> {
         mcom::Rc::from_raw_opt(bb).ok_or(Error::new_hr("IDirect3DSwapChain9::GetBackBuffer", hr, "IDirect3DSurface9 is null"))
     }
 
-    unsafe fn create_index_buffer_from<I: Index>(&self, usage: DWORD, pool: D3DPOOL, data: &[I]) -> Result<mcom::Rc<IDirect3DIndexBuffer9>, Error> {
+    unsafe fn create_index_buffer_from<I: Index>(&self, usage: DWORD, pool: D3DPOOL, data: &[I], _debug_name: &str) -> Result<mcom::Rc<IDirect3DIndexBuffer9>, Error> {
         let size : UINT = std::mem::size_of_val(data).try_into().map_err(|_| Error::new("mcom::Rc<IDirect3DDevice9>::create_index_buffer_from", "", 0, "size_of_val(data) exceeded UINT"))?;
         let mut ib = null_mut();
         let hr = self.CreateIndexBuffer(size, usage, I::d3dfmt(), pool, &mut ib, null_mut());
@@ -129,10 +130,14 @@ impl IDirect3DDevice9Ext for mcom::Rc<IDirect3DDevice9> {
         let hr = ib.Unlock();
         Error::check_hr("IDirect3DIndexBuffer9::Unlock", hr, "")?;
 
+        if cfg!(debug_assertions) && _debug_name != "" {
+            let _ = ib.set_private_data_raw(&WKPDID_D3DDebugObjectName, _debug_name.as_bytes());
+        }
+
         Ok(ib)
     }
 
-    unsafe fn create_vertex_buffer_from<V: Vertex>(&self, usage: DWORD, pool: D3DPOOL, data: &[V]) -> Result<mcom::Rc<IDirect3DVertexBuffer9>, Error> {
+    unsafe fn create_vertex_buffer_from<V: Vertex>(&self, usage: DWORD, pool: D3DPOOL, data: &[V], _debug_name: &str) -> Result<mcom::Rc<IDirect3DVertexBuffer9>, Error> {
         let size : UINT = std::mem::size_of_val(data).try_into().map_err(|_| Error::new("mcom::Rc<IDirect3DDevice9>::create_vertex_buffer_decl_from", "", 0, "size_of_val(data) exceeded UINT"))?;
         let mut vb = null_mut();
         let hr = self.CreateVertexBuffer(size, usage, 0, pool, &mut vb, null_mut());
@@ -146,6 +151,10 @@ impl IDirect3DDevice9Ext for mcom::Rc<IDirect3DDevice9> {
 
         let hr = vb.Unlock();
         Error::check_hr("IDirect3DVertexBuffer9::Unlock", hr, "")?;
+
+        if cfg!(debug_assertions) && _debug_name != "" {
+            let _ = vb.set_private_data_raw(&WKPDID_D3DDebugObjectName, _debug_name.as_bytes());
+        }
 
         Ok(vb)
     }
@@ -223,6 +232,22 @@ impl IDirect3DResource9Ext for mcom::Rc<IDirect3DResource9> {
         Error::check_hr("IDirect3DResource9::SetPrivateData", hr, "")?;
         Ok(())
     }
+}
+
+impl IDirect3DResource9Ext for mcom::Rc<IDirect3DIndexBuffer9> {
+    fn free_private_data(&self, guid: &GUID) -> Result<(), Error> { self.up_ref().free_private_data(guid) }
+    fn get_private_data_raw<'d>(&self, guid: &GUID, data: &'d mut [u8]) -> Result<&'d [u8], Error> { self.up_ref().get_private_data_raw(guid, data) }
+    fn set_private_data_raw    (&self, guid: &GUID, data: &       [u8]) -> Result<(),       Error> { self.up_ref().set_private_data_raw(guid, data) }
+    unsafe fn get_private_data_com<I: Interface>(&self, guid: &GUID) -> Result<mcom::Rc<I>, Error> { self.up_ref().get_private_data_com(guid) }
+    fn set_private_data_com<I: Interface>(&self, guid: &GUID, data: &mcom::Rc<I>) -> Result<(), Error> { self.up_ref().set_private_data_com(guid, data) }
+}
+
+impl IDirect3DResource9Ext for mcom::Rc<IDirect3DVertexBuffer9> {
+    fn free_private_data(&self, guid: &GUID) -> Result<(), Error> { self.up_ref().free_private_data(guid) }
+    fn get_private_data_raw<'d>(&self, guid: &GUID, data: &'d mut [u8]) -> Result<&'d [u8], Error> { self.up_ref().get_private_data_raw(guid, data) }
+    fn set_private_data_raw    (&self, guid: &GUID, data: &       [u8]) -> Result<(),       Error> { self.up_ref().set_private_data_raw(guid, data) }
+    unsafe fn get_private_data_com<I: Interface>(&self, guid: &GUID) -> Result<mcom::Rc<I>, Error> { self.up_ref().get_private_data_com(guid) }
+    fn set_private_data_com<I: Interface>(&self, guid: &GUID, data: &mcom::Rc<I>) -> Result<(), Error> { self.up_ref().set_private_data_com(guid, data) }
 }
 
 impl IDirect3DResource9Ext for mcom::Rc<IDirect3DSurface9> {

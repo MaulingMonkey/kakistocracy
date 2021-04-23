@@ -65,7 +65,7 @@ impl<'d> SpriteRenderer<'d> {
                     verts.push(SpriteVertex { position: [nx, ny, az, 1.0], texcoord: [u,v] });
                 }
             }
-            self.device.create_vertex_buffer_from(D3DUSAGE_DYNAMIC, D3DPOOL_DEFAULT, &verts[..]).unwrap()
+            self.device.create_vertex_buffer_from(D3DUSAGE_DYNAMIC, D3DPOOL_DEFAULT, &verts[..], "kakistocracy::windows::d3d9::sprite::SpriteRenderer::draw").unwrap()
         };
 
         let texture = self.textures.get_texture_2d_static_file(texture);
@@ -135,7 +135,7 @@ impl Resources {
             indicies.push(4 * quad + 2);
             indicies.push(4 * quad + 3);
         }
-        let quads_ib            = unsafe { device.create_index_buffer_from(D3DUSAGE_DYNAMIC, D3DPOOL_DEFAULT, &indicies[..]) }.unwrap();
+        let quads_ib            = unsafe { device.create_index_buffer_from(D3DUSAGE_DYNAMIC, D3DPOOL_DEFAULT, &indicies[..], "kakistocracy::windows::d3d9::sprite::Resources::quads_ib") }.unwrap();
         let sprite_vertex_vdecl = device.create_vertex_decl_from::<SpriteVertex>().unwrap();
         Self { quads_ib, sprite_vertex_vdecl }
     }

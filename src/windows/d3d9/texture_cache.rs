@@ -145,7 +145,9 @@ impl BasicTextureCache {
         let hr = unsafe { tex.UnlockRect(0) };
         Error::check_hr("IDirect3DTexture9::UnlockRect", hr, "")?;
 
-        let _ = tex.set_private_data_raw(&WKPDID_D3DDebugObjectName, _debug_name.as_bytes());
+        if cfg!(debug_assertions) {
+            let _ = tex.set_private_data_raw(&WKPDID_D3DDebugObjectName, _debug_name.as_bytes());
+        }
 
         Ok(Entry2D { texture: tex, error: None })
     }
