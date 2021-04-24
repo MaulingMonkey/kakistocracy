@@ -79,6 +79,7 @@ pub fn each_frame(f: impl 'static + FnMut(&EachFrameArgs) -> bool) {
     TL.with(|tl| tl.each_frame_pending.borrow_mut().push(Box::new(f)));
 }
 
+/// Arguments to [`each_frame`]'s callbacks.
 #[non_exhaustive]
 pub struct EachFrameArgs {
     // TODO: time deltas?
