@@ -1,5 +1,5 @@
 #![deny(unreachable_patterns)]
 
-#[path = "macros/_macros.rs"  ]     mod macros;
-#[path = "utility/_utility.rs"] pub mod utility;
-#[path = "windows/_windows.rs"] pub mod windows;
+#[path = "io/_io.rs"            ] pub mod io;
+#[path = "utility/_utility.rs"  ] pub(crate) mod utility;
+#[path = "windows/_windows.rs"  ] pub mod windows;

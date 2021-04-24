@@ -1,4 +1,5 @@
-use crate::utility::{StaticBytesRef, StaticFile};
+use crate::io::StaticFile;
+use crate::utility::StaticBytesRef;
 use crate::windows::*;
 
 use winapi::shared::d3d9::*;

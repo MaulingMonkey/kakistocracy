@@ -1,6 +1,6 @@
 //! Sprite rendering utilities
 
-use crate::utility::StaticFile;
+use crate::io::StaticFile;
 use crate::windows::*;
 use crate::windows::d3d9::{BasicTextureCache, Vertex};
 
