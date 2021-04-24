@@ -3,12 +3,12 @@ use instant::*;
 
 
 
-pub struct FrameRateCounter {
+pub(crate) struct FrameRateCounter {
     capacity:   usize,
     history:    VecDeque<Instant>,
 }
 
-impl FrameRateCounter {
+#[allow(dead_code)] impl FrameRateCounter {
     pub fn new(capacity: usize) -> Self {
         let mut history = VecDeque::new();
         history.reserve_exact(capacity);
