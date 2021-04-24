@@ -197,7 +197,7 @@ impl IDirect3DResource9Ext for mcom::Rc<IDirect3DResource9> {
     }
 
     fn get_private_data_raw<'d>(&self, guid: &GUID, data: &'d mut [u8]) -> Result<&'d [u8], Error> {
-        let max = DWORD::try_from(data.len()).map_err(|_| Error::new("<D3d9DResourceExt for mcom::Rc<IDirect3DResource9>>::get_private_data", "", 0, "data length exceeds DWORD"))?;
+        let max = DWORD::try_from(data.len()).map_err(|_| Error::new("mcom::Rc<IDirect3DResource9>::get_private_data_raw", "", 0, "data length exceeds DWORD"))?;
         let mut n : DWORD = max;
         let hr = unsafe { self.GetPrivateData(guid, data.as_mut_ptr().cast(), &mut n) };
         let read = n.min(max) as usize;
@@ -206,7 +206,7 @@ impl IDirect3DResource9Ext for mcom::Rc<IDirect3DResource9> {
     }
 
     fn set_private_data_raw(&self, guid: &GUID, data: &[u8]) -> Result<(), Error> {
-        let n : DWORD = data.len().try_into().map_err(|_| Error::new("<D3d9DResourceExt for mcom::Rc<IDirect3DResource9>>::set_private_data", "", 0, "data length exceeds DWORD"))?;
+        let n : DWORD = data.len().try_into().map_err(|_| Error::new("mcom::Rc<IDirect3DResource9>::set_private_data_raw", "", 0, "data length exceeds DWORD"))?;
         let hr = unsafe { self.SetPrivateData(guid, data.as_ptr().cast(), n, 0) };
         Error::check_hr("IDirect3DResource9::GetPrivateData", hr, "")
     }
