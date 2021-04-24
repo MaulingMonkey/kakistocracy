@@ -37,47 +37,60 @@ impl<'d> SpriteRenderer<'d> {
     }
 
     pub unsafe fn draw(&mut self, texture: &StaticFile, instances: &[Instance]) {
-        let ninstances : UINT = instances.len().try_into().unwrap();
-        let verts = {
-            let mut verts = Vec::new();
-            let [view_x, view_y] = self.viewport.clone();
-            let view_w = view_x.end - view_x.start;
-            let view_h = view_y.end - view_y.start;
-            let two_view_w = 2.0 / view_w;
-            let two_view_h = 2.0 / view_h;
+        if instances.is_empty() { return } // Early out optimization
 
-            for instance in instances.iter() {
-                let [ax, ay, az] = instance.anchor;
-
-                let [u, v] = instance.texcoords.clone();
-                let [x, y] = instance.dimensions.clone();
-                let (sin, cos) = instance.rotation.sin_cos();
-
-                for [x, y, u, v] in [
-                    [x.start, y.start, u.start, v.start],
-                    [x.end  , y.start, u.end  , v.start],
-                    [x.end  , y.end  , u.end  , v.end  ],
-                    [x.start, y.end  , u.start, v.end  ],
-                ].iter().copied() {
-                    let [x, y] = [ax + x * cos - y * sin, ay + y * cos + x * sin];
-                    let nx = (x - view_x.start) * two_view_w - 1.0;
-                    let ny = 1.0 - (y - view_y.start) * two_view_h;
-                    verts.push(SpriteVertex { position: [nx, ny, az, 1.0], texcoord: [u,v] });
-                }
-            }
-            self.device.create_vertex_buffer_from(D3DUSAGE_DYNAMIC, D3DPOOL_DEFAULT, &verts[..], "kakistocracy::windows::d3d9::sprite::SpriteRenderer::draw").unwrap()
-        };
+        // Common state
 
         let texture = self.textures.get_texture_2d_static_file(texture);
 
         let _hr = self.device.SetRenderState(D3DRS_LIGHTING, false.into());
         let _hr = self.device.SetIndices(self.resources.quads_ib.as_ptr());
         let _hr = self.device.SetVertexDeclaration(self.resources.sprite_vertex_vdecl.as_ptr());
-        let _hr = self.device.SetStreamSource(0, verts.as_ptr(), 0, SpriteVertex::stride());
         let _hr = self.device.SetTexture(0, texture.up_ref().as_ptr());
         let _hr = self.device.SetPixelShader(null_mut());
         let _hr = self.device.SetVertexShader(null_mut());
-        let _hr = self.device.DrawIndexedPrimitive(D3DPT_TRIANGLELIST, 0, 0, ninstances * 4, 0, ninstances * 2);
+
+        // Instances
+
+        let [view_x, view_y] = self.viewport.clone();
+        let view_w = view_x.end - view_x.start;
+        let view_h = view_y.end - view_y.start;
+        let two_view_w = 2.0 / view_w;
+        let two_view_h = 2.0 / view_h;
+
+        // limit of shared quads_ib
+        const MAX_QUADS_PER_DRAW : u16 = std::u16::MAX / 4;
+
+        for instances in instances.chunks(MAX_QUADS_PER_DRAW.into()) {
+            let verts = {
+                let mut verts = Vec::new();
+
+                for instance in instances.iter() {
+                    let [ax, ay, az] = instance.anchor;
+
+                    let [u, v] = instance.texcoords.clone();
+                    let [x, y] = instance.dimensions.clone();
+                    let (sin, cos) = instance.rotation.sin_cos();
+
+                    for [x, y, u, v] in [
+                        [x.start, y.start, u.start, v.start],
+                        [x.end  , y.start, u.end  , v.start],
+                        [x.end  , y.end  , u.end  , v.end  ],
+                        [x.start, y.end  , u.start, v.end  ],
+                    ].iter().copied() {
+                        let [x, y] = [ax + x * cos - y * sin, ay + y * cos + x * sin];
+                        let nx = (x - view_x.start) * two_view_w - 1.0;
+                        let ny = 1.0 - (y - view_y.start) * two_view_h;
+                        verts.push(SpriteVertex { position: [nx, ny, az, 1.0], texcoord: [u,v] });
+                    }
+                }
+                self.device.create_vertex_buffer_from(D3DUSAGE_DYNAMIC, D3DPOOL_DEFAULT, &verts[..], "kakistocracy::windows::d3d9::sprite::SpriteRenderer::draw").unwrap()
+            };
+
+            let ninstances = instances.len() as UINT;
+            let _hr = self.device.SetStreamSource(0, verts.as_ptr(), 0, SpriteVertex::stride());
+            let _hr = self.device.DrawIndexedPrimitive(D3DPT_TRIANGLELIST, 0, 0, ninstances * 4, 0, ninstances * 2);
+        }
     }
 }
 
