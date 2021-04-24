@@ -364,6 +364,7 @@ fn enum_thread_windows<F: FnMut(HWND) -> bool>(dw_thread_id: DWORD, mut f: F) ->
     unsafe { EnumThreadWindows(dw_thread_id, Some(imp::<F>), f as LPARAM) != 0 }
 }
 
+/// Returns `true` if there are any open windows associated with the current thread.
 pub fn any_current_thread_windows() -> bool {
     let mut any = false;
     let thread = unsafe { GetCurrentThreadId() };
