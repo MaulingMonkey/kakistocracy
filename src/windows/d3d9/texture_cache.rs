@@ -17,17 +17,20 @@ use std::time::SystemTime;
 
 
 
-pub struct BasicTextureCache {
+pub(crate) struct BasicTextureCache {
     device:                 mcom::Rc<IDirect3DDevice9>,
 
     placeholder_2d_error:   mcom::Rc<IDirect3DTexture9>,
+    #[allow(dead_code)]
     placeholder_2d_missing: mcom::Rc<IDirect3DTexture9>,
 
     static_files:           RefCell<HashMap<StaticBytesRef,     Entry2D>>,
+    #[allow(dead_code)]
     dynamic_files:          RefCell<HashMap<Cow<'static, Path>, Dynamic<Entry2D>>>,
 }
 
 impl BasicTextureCache {
+    #[allow(dead_code)]
     pub fn get(device: &mcom::Rc<IDirect3DDevice9>) -> impl Deref<Target = Self> {
         d3d9::device_private_data_get_or_insert(device, || BasicTextureCache::new(device.clone()))
     }
@@ -55,6 +58,7 @@ impl BasicTextureCache {
         entry.texture.clone()
     }
 
+    #[allow(dead_code)]
     pub fn get_texture_2d_static_path(&self, path: &'static Path) -> mcom::Rc<IDirect3DTexture9> {
         let mut dynamic_files = self.dynamic_files.borrow_mut();
         let entry = dynamic_files.entry(Cow::Borrowed(path)).or_insert_with(|| {
@@ -68,6 +72,7 @@ impl BasicTextureCache {
 }
 
 impl BasicTextureCache {
+    #[allow(dead_code)]
     fn read_bytes_mod(path: &Path, st: &mut SystemTime) -> io::Result<Vec<u8>> {
         *st = SystemTime::UNIX_EPOCH;
         let mut file = std::fs::File::open(path)?;
@@ -78,6 +83,7 @@ impl BasicTextureCache {
         Ok(buf)
     }
 
+    #[allow(dead_code)]
     fn entry_io_error(&self, err: io::Error) -> Entry2D {
         Entry2D {
             texture:    if err.kind() == io::ErrorKind::NotFound { &self.placeholder_2d_missing } else { &self.placeholder_2d_error }.clone(),

@@ -8,5 +8,5 @@ mod errors;                     pub(crate) use errors::*;
 mod mwc;                        pub use mwc::*;
 pub(crate) mod prelude;         #[allow(unused_imports)] pub(crate) use prelude::*;
 pub mod sprite;
-mod texture_cache;              pub use texture_cache::*;
+mod texture_cache;              pub(crate) use texture_cache::*;
 mod traits;                     pub use traits::*;
