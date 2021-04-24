@@ -2,4 +2,4 @@
 
 #![cfg(feature = "dxgi")]
 
-pub mod prelude;                pub use prelude::*;
+pub(crate) mod prelude;         #[allow(unused_imports)] pub(crate) use prelude::*;
