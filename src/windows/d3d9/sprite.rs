@@ -1,6 +1,9 @@
 //! Sprite rendering utilities
 
+pub use crate::sprite::*;
+
 use crate::io::StaticFile;
+use crate::sprite;
 use crate::windows::*;
 use crate::windows::d3d9::{BasicTextureCache, Vertex};
 
@@ -81,14 +84,14 @@ impl<'d> SpriteRenderer<'d> {
                         let [x, y] = [ax + x * cos - y * sin, ay + y * cos + x * sin];
                         let nx = (x - view_x.start) * two_view_w - 1.0;
                         let ny = 1.0 - (y - view_y.start) * two_view_h;
-                        verts.push(SpriteVertex { position: [nx, ny, az, 1.0], texcoord: [u,v] });
+                        verts.push(sprite::Vertex { position: [nx, ny, az, 1.0], texcoord: [u,v] });
                     }
                 }
                 self.device.create_vertex_buffer_from(D3DUSAGE_DYNAMIC, D3DPOOL_DEFAULT, &verts[..], "kakistocracy::windows::d3d9::sprite::SpriteRenderer::draw").unwrap()
             };
 
             let ninstances = instances.len() as UINT;
-            let _hr = self.device.SetStreamSource(0, verts.as_ptr(), 0, SpriteVertex::stride());
+            let _hr = self.device.SetStreamSource(0, verts.as_ptr(), 0, sprite::Vertex::stride());
             let _hr = self.device.DrawIndexedPrimitive(D3DPT_TRIANGLELIST, 0, 0, ninstances * 4, 0, ninstances * 2);
         }
     }
@@ -100,28 +103,9 @@ pub unsafe fn draw(device: &mcom::Rc<IDirect3DDevice9>, texture: &StaticFile, in
     SpriteRenderer::new(device).draw(texture, instances)
 }
 
-
-
-#[repr(C)]
-#[derive(Clone)]
-pub struct Instance {
-    pub anchor:     [f32; 3],
-    pub rotation:   f32,
-    pub dimensions: [Range<f32>; 2],
-    pub texcoords:  [Range<f32>; 2],
-}
-
-
-
-#[repr(C)]
-#[derive(Clone, Copy)]
-struct SpriteVertex {
-    pub position: [f32; 4],
-    pub texcoord: [f32; 2],
-}
-
-unsafe impl d3d9::Vertex for SpriteVertex {
+unsafe impl d3d9::Vertex for sprite::Vertex {
     type Decl = &'static [D3DVERTEXELEMENT9];
+
     fn elements() -> Self::Decl { &[
         D3DVERTEXELEMENT9 { Stream: 0, Offset:  0, Method: D3DDECLMETHOD_DEFAULT as _, Type: D3DDECLTYPE_FLOAT4 as _, Usage: D3DDECLUSAGE_POSITION as _, UsageIndex: 0 },
         D3DVERTEXELEMENT9 { Stream: 0, Offset: 16, Method: D3DDECLMETHOD_DEFAULT as _, Type: D3DDECLTYPE_FLOAT2 as _, Usage: D3DDECLUSAGE_TEXCOORD as _, UsageIndex: 0 },
@@ -138,18 +122,9 @@ struct Resources {
 
 impl Resources {
     fn new(device: &mcom::Rc<IDirect3DDevice9>) -> Self {
-        let mut indicies = Vec::new();
-        for quad in 0 ..= std::u16::MAX/4 {
-            indicies.push(4 * quad + 0);
-            indicies.push(4 * quad + 1);
-            indicies.push(4 * quad + 2);
-
-            indicies.push(4 * quad + 0);
-            indicies.push(4 * quad + 2);
-            indicies.push(4 * quad + 3);
-        }
+        let indicies            = create_quads_index_data(std::u16::MAX/4);
         let quads_ib            = unsafe { device.create_index_buffer_from(D3DUSAGE_DYNAMIC, D3DPOOL_DEFAULT, &indicies[..], "kakistocracy::windows::d3d9::sprite::Resources::quads_ib") }.unwrap();
-        let sprite_vertex_vdecl = device.create_vertex_decl_from::<SpriteVertex>().unwrap();
+        let sprite_vertex_vdecl = device.create_vertex_decl_from::<sprite::Vertex>().unwrap();
         Self { quads_ib, sprite_vertex_vdecl }
     }
 }
