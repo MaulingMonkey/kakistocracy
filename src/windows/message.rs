@@ -11,6 +11,8 @@ use futures::executor::*;
 use futures::task::*;
 
 use winapi::ctypes::c_int;
+use winapi::shared::minwindef::*;
+use winapi::shared::windef::*;
 use winapi::um::winuser::*;
 
 use std::cell::RefCell;
@@ -77,6 +79,17 @@ pub fn spawn_local<F: Future<Output = ()> + 'static>(f: F) -> Result<(), SpawnEr
 /// If the callback ever returns `false`, it will be unregistered and not called again.
 pub fn each_frame(f: impl 'static + FnMut(&EachFrameArgs) -> bool) {
     TL.with(|tl| tl.each_frame_pending.borrow_mut().push(Box::new(f)));
+}
+
+/// A win32 message handler (provides a [`wndproc`](Self::wndproc))
+pub trait Handler {
+    /// A [`WNDPROC`](https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms633573(v=vs.85)) analog
+    ///
+    /// ### Safety
+    ///
+    /// * `hwnd` must be a valid window handle (older versions of windows may treat this as a raw, dereferencable pointer)
+    /// * `wparam` / `lparam` may need to be valid pointers, depending on which `msg` is passed in.
+    unsafe fn wndproc(&self, hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARAM) -> LRESULT;
 }
 
 /// Arguments to [`each_frame`]'s callbacks.

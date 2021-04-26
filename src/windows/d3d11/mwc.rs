@@ -1,13 +1,18 @@
 use crate::windows::*;
 
 use mcom::AsIUnknown;
+
+use wchar::wch_c;
+
 use winapi::shared::dxgi::*;
 use winapi::shared::dxgiformat::{DXGI_FORMAT_B8G8R8A8_UNORM};
 use winapi::shared::dxgitype::*;
 use winapi::shared::minwindef::*;
-use winapi::shared::winerror::{E_INVALIDARG, SUCCEEDED};
+use winapi::shared::windef::*;
+use winapi::shared::winerror::*;
 use winapi::um::d3d11::*;
 use winapi::um::d3dcommon::*;
+use winapi::um::winuser::*;
 
 use std::any::*;
 use std::cell::RefCell;
@@ -22,6 +27,15 @@ pub trait CreateFromDevice {
     fn new(device: &mcom::Rc<ID3D11Device>) -> Self;
 }
 
+pub type RenderArgs = MultiWindowContextLockWindow;
+
+pub trait Render {
+    fn render(&self, args: &RenderArgs);
+}
+
+trait Context : Render + message::Handler + 'static {}
+impl<T: Render + message::Handler + 'static> Context for T {}
+
 
 
 /// Shares [`ID3D11Device`]s between multiple windows.
@@ -34,7 +48,7 @@ pub trait CreateFromDevice {
 pub struct MultiWindowContext {
     // NOTE: drop order might be important here!
     dac:            Option<DeviceAndAssoc>, // might be None for headless servers, some device lost scenarios, etc.
-    windows:        Vec<OwnedWindow>,
+    windows:        Vec<HWND>,
 }
 
 pub struct MultiWindowContextLock {
@@ -44,9 +58,12 @@ pub struct MultiWindowContextLock {
 }
 
 pub struct MultiWindowContextLockWindow {
-    pub window:     Window,
-    pub rtv:        mcom::Rc<ID3D11RenderTargetView>,
-    pub swap_chain: mcom::Rc<IDXGISwapChain>,
+    pub device:             mcom::Rc<ID3D11Device>,
+    pub immediate_context:  mcom::Rc<ID3D11DeviceContext>,
+    pub window:             HWND,
+    pub rtv:                mcom::Rc<ID3D11RenderTargetView>,
+    pub swap_chain:         mcom::Rc<IDXGISwapChain>,
+    client_size:    (u32, u32),
 }
 
 struct DeviceAndAssoc {
@@ -58,9 +75,9 @@ struct DeviceAndAssoc {
     device:             mcom::Rc<ID3D11Device>,
 }
 
-#[derive(Default)]
 struct WindowAssoc {
     // NOTE: drop order might be important here!
+    context:        Box<dyn Context>,
     swap_chain_rtv: RefCell<Option<(
         mcom::Rc<IDXGISwapChain>,
         mcom::Rc<ID3D11RenderTargetView>,
@@ -94,18 +111,31 @@ impl MultiWindowContext {
         }
     }
 
-    pub fn create_fullscreen_window(&mut self, monitor: usize, title: &str) -> Result<Window, Error> {
-        let window = Window::create_fullscreen(monitor, title)?;
-        window.set(WindowAssoc::default());
-        self.windows.push(OwnedWindow::new(window.clone()));
-        Ok(window)
+    pub fn create_fullscreen_window(&mut self, monitor: impl monitor::Selector, title: &str, context: impl Render + message::Handler + 'static) -> Result<(), Error> {
+        self.create_window_impl(title, monitor.monitor_area(), WS_POPUP | WS_VISIBLE, context)
     }
 
-    pub fn create_window_at(&mut self, title: &str, area: impl IntoRect) -> Result<Window, Error> {
-        let window = Window::create_at(title, area)?;
-        window.set(WindowAssoc::default());
-        self.windows.push(OwnedWindow::new(window.clone()));
-        Ok(window)
+    pub fn create_window_at(&mut self, title: &str, area: impl IntoRect, context: impl Render + message::Handler + 'static) -> Result<(), Error> {
+        self.create_window_impl(title, area.into(), WS_OVERLAPPEDWINDOW | WS_VISIBLE, context)
+    }
+
+    fn create_window_impl(&mut self, title: &str, area: RECT, style: DWORD, context: impl Render + message::Handler + 'static) -> Result<(), Error> {
+        let hwnd = unsafe { CreateWindowExW(
+            0,
+            MAKEINTATOMW(*D3D11_MWC_WNDCLASS),
+            title.encode_utf16().chain(Some(0)).collect::<Vec<_>>().as_ptr(),
+            style,
+            area.left, area.top, area.right - area.left, area.bottom - area.top,
+            null_mut(), null_mut(), get_module_handle_exe(), null_mut()
+        )};
+        if hwnd.is_null() { return Error::last("CreateWindowExW", "resulting hwnd is null"); }
+
+        hwnd::assoc::set(hwnd, WindowAssoc {
+            context:        Box::new(context),
+            swap_chain_rtv: Default::default(),
+        })?;
+        self.windows.push(hwnd);
+        Ok(())
     }
 
     pub fn lock(&mut self, allow_no_rendered_windows: bool) -> Option<MultiWindowContextLock> {
@@ -115,11 +145,14 @@ impl MultiWindowContext {
 
         let device = dac.device.clone();
         let immediate_context = dac.immediate_context.clone();
-        let windows = self.windows.iter().filter_map(|window|{
-            if !window.should_render() { return None; }
-            let hwnd = window.hwnd()?;
-            let client_size = window.get_client_rect().ok()?.size();
-            let wa = window.get_or_default::<WindowAssoc>()?;
+        let windows = self.windows.iter().filter_map(|&hwnd|{
+            if unsafe { IsWindowVisible(hwnd) == FALSE } { return None; }
+            if unsafe { IsIconic(hwnd)        != FALSE } { return None; }
+            let mut rect = unsafe { std::mem::zeroed() };
+            unsafe { GetClientRect(hwnd, &mut rect) }; // XXX: Error check?
+            let client_size = ((rect.right - rect.left) as u32, (rect.bottom - rect.top) as u32);
+            let wa = hwnd::assoc::get::<WindowAssoc>(hwnd).ok()?;
+
             let mut wa_swap_chain_rtv = wa.swap_chain_rtv.borrow_mut();
             let wa_swap_chain_rtv = &mut *wa_swap_chain_rtv;
             let (swap_chain, rtv) = match wa_swap_chain_rtv.clone() {
@@ -164,32 +197,47 @@ impl MultiWindowContext {
                 },
             };
             Some(MultiWindowContextLockWindow {
-                window: (*window).clone(),
+                device: device.clone(),
+                immediate_context: immediate_context.clone(),
+                window: hwnd,
                 swap_chain,
                 rtv,
+                client_size,
             })
         }).collect::<Vec<MultiWindowContextLockWindow>>();
         if windows.is_empty() && !allow_no_rendered_windows { return None; }
         Some(MultiWindowContextLock { device, immediate_context, windows })
     }
+
+    pub fn render_visible_windows(&mut self) {
+        if let Some(lock) = self.lock(false) {
+            for window in lock.windows.iter() {
+                if let Ok(assoc) = hwnd::assoc::get::<WindowAssoc>(window.window) {
+                    assoc.context.render(&window);
+                }
+            }
+        }
+    }
 }
 
 impl MultiWindowContextLockWindow {
+    pub fn bind_immediate_context(&self) -> Result<(), Error> {
+        unsafe { self.bind(&self.immediate_context) }
+    }
+
     /// Binds the next back buffer of the window's swap chain as the render target, and sets the viewport to the entire window.
     ///
     /// ### Safety
     /// * `device` must be the same device as the originating [`MultiWindowContext`]
     pub unsafe fn bind(&self, ctx: &mcom::Rc<ID3D11DeviceContext>) -> Result<(), Error> {
-        let rect = self.window.get_client_rect()?;
-
         let rtvs = [self.rtv.as_ptr()];
         ctx.OMSetRenderTargets(rtvs.len() as _, rtvs.as_ptr(), null_mut());
 
         let viewports = [D3D11_VIEWPORT{
             TopLeftX:   0.0,
             TopLeftY:   0.0,
-            Width:      f64::from(rect.width() ) as f32,
-            Height:     f64::from(rect.height()) as f32,
+            Width:      f64::from(self.client_width() ) as f32,
+            Height:     f64::from(self.client_height()) as f32,
             MinDepth:   0.0,
             MaxDepth:   1.0,
         }];
@@ -197,6 +245,14 @@ impl MultiWindowContextLockWindow {
 
         Ok(())
     }
+
+    pub fn client_size  (&self) -> (u32, u32)   { self.client_size }
+    pub fn client_width (&self) -> u32          { self.client_size.0 }
+    pub fn client_height(&self) -> u32          { self.client_size.1 }
+
+    pub fn client_size_usize    (&self) -> (usize, usize)   { let (w, h) = self.client_size; (w as usize, h as usize) }
+    pub fn client_width_usize   (&self) -> usize            { self.client_size.0 as usize }
+    pub fn client_height_usize  (&self) -> usize            { self.client_size.1 as usize }
 }
 
 
@@ -219,7 +275,7 @@ impl MultiWindowContext {
     }
 
     pub(crate) fn cull_destroyed_windows(&mut self) {
-        self.windows.retain(|pw| pw.is_alive())
+        self.windows.retain(|&hwnd| hwnd::assoc::valid_window(hwnd));
     }
 
     pub(crate) fn try_create_device(&mut self) -> Result<(), Error> {
@@ -289,4 +345,30 @@ impl MultiWindowContext {
 fn get_back_buffer_size(swap_chain: &mcom::Rc<IDXGISwapChain>) -> (u32, u32) {
     let desc = swap_chain.get_desc().unwrap();
     (desc.BufferDesc.Width, desc.BufferDesc.Height)
+}
+
+lazy_static::lazy_static! {
+    static ref D3D11_MWC_WNDCLASS : ATOM = unsafe { register_class_w(&WNDCLASSW {
+        style:          0,
+        lpfnWndProc:    Some(wndproc),
+        cbClsExtra:     0,
+        cbWndExtra:     0,
+        hInstance:      get_module_handle_exe(),
+        hIcon:          null_mut(),
+        hCursor:        LoadCursorW(null_mut(), IDC_ARROW),
+        hbrBackground:  null_mut(),
+        lpszMenuName:   null_mut(),
+        lpszClassName:  wch_c!("kakistocracy-d3d11-window").as_ptr(),
+    })}.unwrap();
+}
+
+/// ### Safety
+/// * `hwnd` might be a real pointer in older versions of Windows
+/// * `wparam` / `lparam` might be treated as raw pointers depending on `msg`
+/// * ...
+unsafe extern "system" fn wndproc(hwnd: HWND, msg: DWORD, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    match hwnd::assoc::get::<WindowAssoc>(hwnd) {
+        Ok(assoc) => assoc.context.wndproc(hwnd, msg, wparam, lparam),
+        Err(_err) => DefWindowProcW(hwnd, msg, wparam, lparam),
+    }
 }

@@ -334,7 +334,7 @@ unsafe extern "system" fn stub_window_proc(hwnd: HWND, msg: DWORD, wparam: WPARA
 /// * `wndclass` should contain valid pointers
 /// * `wndclass.lpfnWndProc` is an unsafe fn and will be called by Win32
 /// * ...
-unsafe fn register_class_w(wndclass: &WNDCLASSW) -> Result<ATOM, Error> {
+pub(crate) unsafe fn register_class_w(wndclass: &WNDCLASSW) -> Result<ATOM, Error> {
     let atom = RegisterClassW(wndclass);
     if atom != 0 {
         Ok(atom)
