@@ -66,23 +66,13 @@
         }
     }
 
-    let mut mwc9 = d3d9::MultiWindowContext::new().unwrap();
-    let mut mwc11 = d3d11::MultiWindowContext::new().unwrap();
-
     let ctx = Context::default();
-    mwc9 .create_window_at("wide9",  [ 10.. 10+320,  10.. 10+230], ctx.clone()).unwrap();
-    mwc11.create_window_at("wide11", [330..330+320,  10.. 10+230], ctx.clone()).unwrap();
-    mwc9 .create_window_at("tall9",  [ 10.. 10+240, 250..250+320], ctx.clone()).unwrap();
-    mwc11.create_window_at("tall11", [250..250+240, 250..250+320], ctx.clone()).unwrap();
-    mwc9 .create_fullscreen_window(monitor::ByOrderX( 1), "fullscreen9",  ctx.clone()).unwrap();
-    mwc11.create_fullscreen_window(monitor::ByOrderX( 3), "fullscreen11", ctx.clone()).unwrap();
-
-    message::each_frame(move |_| {
-        mwc9 .render_visible_windows();
-        mwc11.render_visible_windows();
-        // XXX: if different windows have different refresh rates, should D3DPRESENT_DONOTWAIT be attempted first?
-        true
-    });
+    d3d9 ::create_window_at("wide9",  [ 10.. 10+320,  10.. 10+230], ctx.clone()).unwrap();
+    d3d11::create_window_at("wide11", [330..330+320,  10.. 10+230], ctx.clone()).unwrap();
+    d3d9 ::create_window_at("tall9",  [ 10.. 10+240, 250..250+320], ctx.clone()).unwrap();
+    d3d11::create_window_at("tall11", [250..250+240, 250..250+320], ctx.clone()).unwrap();
+    d3d9 ::create_fullscreen_window(monitor::ByOrderX( 1), "fullscreen9",  ctx.clone()).unwrap();
+    d3d11::create_fullscreen_window(monitor::ByOrderX( 3), "fullscreen11", ctx.clone()).unwrap();
 
     message::loop_until_wm_quit();
 }

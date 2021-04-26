@@ -14,20 +14,14 @@ use winapi::um::d3d11::*;
 use winapi::um::d3dcommon::*;
 use winapi::um::winuser::*;
 
-use std::any::*;
 use std::cell::RefCell;
-use std::collections::*;
-use std::ops::Deref;
 use std::ptr::null_mut;
-use std::rc::Rc;
 
 
 
 pub trait CreateFromDevice {
     fn new(device: &mcom::Rc<ID3D11Device>) -> Self;
 }
-
-pub type RenderArgs = MultiWindowContextLockWindow;
 
 pub trait Render {
     fn render(&self, args: &RenderArgs);
@@ -45,19 +39,19 @@ impl<T: Render + message::Handler + 'static> Context for T {}
 /// The "primary" window is a hidden 1x1 message-only stub window.
 ///
 /// [`ID3D11Device`]:   https://docs.microsoft.com/en-us/windows/win32/api/d3d11/nn-d3d11-id3d11device
-pub struct MultiWindowContext {
+struct ThreadLocal {
     // NOTE: drop order might be important here!
-    dac:            Option<DeviceAndAssoc>, // might be None for headless servers, some device lost scenarios, etc.
-    windows:        Vec<HWND>,
+    dac:            RefCell<Option<DeviceAndAssoc>>, // might be None for headless servers, some device lost scenarios, etc.
+    windows:        RefCell<Vec<HWND>>,
 }
 
-pub struct MultiWindowContextLock {
+struct RenderLock {
     pub device:             mcom::Rc<ID3D11Device>,
     pub immediate_context:  mcom::Rc<ID3D11DeviceContext>,
-    pub windows:            Vec<MultiWindowContextLockWindow>,
+    pub windows:            Vec<RenderArgs>,
 }
 
-pub struct MultiWindowContextLockWindow {
+pub struct RenderArgs {
     pub device:             mcom::Rc<ID3D11Device>,
     pub immediate_context:  mcom::Rc<ID3D11DeviceContext>,
     pub window:             HWND,
@@ -68,7 +62,6 @@ pub struct MultiWindowContextLockWindow {
 
 struct DeviceAndAssoc {
     // NOTE: drop order might be important here!
-    statics:            RefCell<HashMap<TypeId, Rc<dyn Any>>>,
     #[allow(dead_code)] // TODO: expose somehow?
     feature_level:      D3D_FEATURE_LEVEL,
     immediate_context:  mcom::Rc<ID3D11DeviceContext>,
@@ -86,40 +79,31 @@ struct WindowAssoc {
 
 
 /// Constructors
-impl MultiWindowContext {
-    pub fn new() -> Result<Self, Error> {
-        let mut mwc = Self::new_raw()?;
-        mwc.try_create_device()?; // TODO: variant which allows deviceless init? what would be the use case tho? d3d9 runtime installer? driver installer?
-        Ok(mwc)
-    }
+impl ThreadLocal {
+    pub fn with<R>(f: impl FnOnce(&ThreadLocal) -> R) -> R { TL.with(f) }
+}
+
+thread_local! { static TL : ThreadLocal = ThreadLocal::new(); }
+
+pub fn create_fullscreen_window(monitor: impl monitor::Selector, title: &str, context: impl Render + message::Handler + 'static) -> Result<(), Error> {
+    ThreadLocal::with(|tl| tl.create_fullscreen_window(monitor, title, context))
+}
+
+pub fn create_window_at(title: &str, area: impl IntoRect, context: impl Render + message::Handler + 'static) -> Result<(), Error> {
+    ThreadLocal::with(|tl| tl.create_window_at(title, area, context))
 }
 
 /// Public Methods
-impl MultiWindowContext {
-    pub fn has_device(&self) -> bool { self.dac.is_some() }
-
-    pub fn per_device<C: Any + CreateFromDevice>(&self) -> Option<impl Deref<Target = C>> {
-        match self.dac.as_ref() {
-            Some(dac) => {
-                let rc_any = match dac.statics.borrow_mut().entry(TypeId::of::<C>()) {
-                    hash_map::Entry::Occupied(o)    => o.get().clone(),
-                    hash_map::Entry::Vacant(v)      => v.insert(Rc::new(C::new(&dac.device))).clone(),
-                };
-                Some(rc_any.downcast().unwrap())
-            },
-            None => None,
-        }
-    }
-
-    pub fn create_fullscreen_window(&mut self, monitor: impl monitor::Selector, title: &str, context: impl Render + message::Handler + 'static) -> Result<(), Error> {
+impl ThreadLocal {
+    pub fn create_fullscreen_window(&self, monitor: impl monitor::Selector, title: &str, context: impl Render + message::Handler + 'static) -> Result<(), Error> {
         self.create_window_impl(title, monitor.monitor_area(), WS_POPUP | WS_VISIBLE, context)
     }
 
-    pub fn create_window_at(&mut self, title: &str, area: impl IntoRect, context: impl Render + message::Handler + 'static) -> Result<(), Error> {
+    pub fn create_window_at(&self, title: &str, area: impl IntoRect, context: impl Render + message::Handler + 'static) -> Result<(), Error> {
         self.create_window_impl(title, area.into(), WS_OVERLAPPEDWINDOW | WS_VISIBLE, context)
     }
 
-    fn create_window_impl(&mut self, title: &str, area: RECT, style: DWORD, context: impl Render + message::Handler + 'static) -> Result<(), Error> {
+    fn create_window_impl(&self, title: &str, area: RECT, style: DWORD, context: impl Render + message::Handler + 'static) -> Result<(), Error> {
         let hwnd = unsafe { CreateWindowExW(
             0,
             MAKEINTATOMW(*D3D11_MWC_WNDCLASS),
@@ -134,18 +118,19 @@ impl MultiWindowContext {
             context:        Box::new(context),
             swap_chain_rtv: Default::default(),
         })?;
-        self.windows.push(hwnd);
+        self.windows.borrow_mut().push(hwnd);
         Ok(())
     }
 
-    pub fn lock(&mut self, allow_no_rendered_windows: bool) -> Option<MultiWindowContextLock> {
+    pub fn lock(&self, allow_no_rendered_windows: bool) -> Option<RenderLock> {
         self.cull_destroyed_windows();
         let _ = self.try_create_device();
-        let dac = self.dac.as_ref()?;
+        let dac = self.dac.borrow();
+        let dac = dac.as_ref()?;
 
         let device = dac.device.clone();
         let immediate_context = dac.immediate_context.clone();
-        let windows = self.windows.iter().filter_map(|&hwnd|{
+        let windows = self.windows.borrow().iter().filter_map(|&hwnd|{
             if unsafe { IsWindowVisible(hwnd) == FALSE } { return None; }
             if unsafe { IsIconic(hwnd)        != FALSE } { return None; }
             let mut rect = unsafe { std::mem::zeroed() };
@@ -196,7 +181,7 @@ impl MultiWindowContext {
                     (swap_chain, rtv)
                 },
             };
-            Some(MultiWindowContextLockWindow {
+            Some(RenderArgs {
                 device: device.clone(),
                 immediate_context: immediate_context.clone(),
                 window: hwnd,
@@ -204,12 +189,12 @@ impl MultiWindowContext {
                 rtv,
                 client_size,
             })
-        }).collect::<Vec<MultiWindowContextLockWindow>>();
+        }).collect::<Vec<RenderArgs>>();
         if windows.is_empty() && !allow_no_rendered_windows { return None; }
-        Some(MultiWindowContextLock { device, immediate_context, windows })
+        Some(RenderLock { device, immediate_context, windows })
     }
 
-    pub fn render_visible_windows(&mut self) {
+    pub fn render_visible_windows(&self) {
         if let Some(lock) = self.lock(false) {
             for window in lock.windows.iter() {
                 if let Ok(assoc) = hwnd::assoc::get::<WindowAssoc>(window.window) {
@@ -220,7 +205,7 @@ impl MultiWindowContext {
     }
 }
 
-impl MultiWindowContextLockWindow {
+impl RenderArgs {
     pub fn bind_immediate_context(&self) -> Result<(), Error> {
         unsafe { self.bind(&self.immediate_context) }
     }
@@ -228,7 +213,7 @@ impl MultiWindowContextLockWindow {
     /// Binds the next back buffer of the window's swap chain as the render target, and sets the viewport to the entire window.
     ///
     /// ### Safety
-    /// * `device` must be the same device as the originating [`MultiWindowContext`]
+    /// * `ctx` must belong to <code>self.[device](Self::device)</code>
     pub unsafe fn bind(&self, ctx: &mcom::Rc<ID3D11DeviceContext>) -> Result<(), Error> {
         let rtvs = [self.rtv.as_ptr()];
         ctx.OMSetRenderTargets(rtvs.len() as _, rtvs.as_ptr(), null_mut());
@@ -266,19 +251,24 @@ const DEFAULT_CREATE_FLAGS : D3D11_CREATE_DEVICE_FLAG = // https://docs.microsof
     0;
 
 /// Implementation Details
-impl MultiWindowContext {
-    fn new_raw() -> Result<Self, Error> {
-        Ok(Self {
-            dac:            None,
+impl ThreadLocal {
+    fn new() -> Self {
+        message::each_frame(|_|{
+            ThreadLocal::with(|tl| tl.render_visible_windows());
+            true
+        });
+
+        Self {
+            dac:            Default::default(),
             windows:        Default::default()
-        })
+        }
     }
 
-    pub(crate) fn cull_destroyed_windows(&mut self) {
-        self.windows.retain(|&hwnd| hwnd::assoc::valid_window(hwnd));
+    pub(crate) fn cull_destroyed_windows(&self) {
+        self.windows.borrow_mut().retain(|&hwnd| hwnd::assoc::valid_window(hwnd));
     }
 
-    pub(crate) fn try_create_device(&mut self) -> Result<(), Error> {
+    pub(crate) fn try_create_device(&self) -> Result<(), Error> {
         let feature_levels = [
             D3D_FEATURE_LEVEL_12_1,
             D3D_FEATURE_LEVEL_12_0,
@@ -293,7 +283,7 @@ impl MultiWindowContext {
             D3D_FEATURE_LEVEL_9_1,
         ];
 
-        if self.dac.is_none() {
+        if self.dac.borrow().is_none() {
             let mut device = null_mut();
             let mut feature_level = 0;
             let mut immediate_context = null_mut();
@@ -331,8 +321,7 @@ impl MultiWindowContext {
 
             let device              = device            .ok_or(Error::new_hr("D3D11CreateDevice", hr, "ID3D11Device is null"))?;
             let immediate_context   = immediate_context .ok_or(Error::new_hr("D3D11CreateDevice", hr, "ID3D11DeviceContext is null"))?;
-            self.dac = Some(DeviceAndAssoc {
-                statics:        Default::default(),
+            *self.dac.borrow_mut() = Some(DeviceAndAssoc {
                 feature_level,
                 device,
                 immediate_context,
