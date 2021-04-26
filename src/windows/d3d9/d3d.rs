@@ -7,7 +7,7 @@ use std::ptr::null_mut;
 
 
 /// Create a [`IDirect3D9`](https://docs.microsoft.com/en-us/windows/win32/api/d3d9helper/nn-d3d9helper-idirect3d9) via [`Direct3DCreate9`](https://docs.microsoft.com/en-us/windows/win32/api/d3d9/nf-d3d9-direct3dcreate9)
-pub fn create_d3d(allow_debug: bool) -> Result<mcom::Rc<IDirect3D9>, Error> {
+pub(crate) fn create_d3d(allow_debug: bool) -> Result<mcom::Rc<IDirect3D9>, Error> {
     let mut d3d = null_mut();
     if allow_debug      { d3d = unsafe { Direct3DCreate9(D3D_SDK_VERSION | D3D_SDK_DEBUG) }; }
     if d3d.is_null()    { d3d = unsafe { Direct3DCreate9(D3D_SDK_VERSION | 0            ) }; }
@@ -15,7 +15,8 @@ pub fn create_d3d(allow_debug: bool) -> Result<mcom::Rc<IDirect3D9>, Error> {
 }
 
 /// Create a [`IDirect3D9Ex`](https://docs.microsoft.com/en-us/windows/win32/api/d3d9/nn-d3d9-idirect3d9ex) via [`Direct3DCreate9Ex`](https://docs.microsoft.com/en-us/windows/win32/api/d3d9/nf-d3d9-direct3dcreate9ex)
-pub fn create_d3d_ex(allow_debug: bool) -> Result<mcom::Rc<IDirect3D9Ex>, Error> {
+#[allow(dead_code)]
+pub(crate) fn create_d3d_ex(allow_debug: bool) -> Result<mcom::Rc<IDirect3D9Ex>, Error> {
     let mut d3d = null_mut();
     let mut hr = 0;
     if allow_debug      { hr = unsafe { Direct3DCreate9Ex(D3D_SDK_VERSION | D3D_SDK_DEBUG, &mut d3d) }; }

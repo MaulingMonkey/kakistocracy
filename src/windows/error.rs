@@ -35,8 +35,12 @@ pub struct Error {
 }
 
 impl Error {
+    /// The error code, as a [`u32`].
     pub fn u32(&self) -> u32 { self.error as _ }
+
+    /// The error code, as an [`HRESULT`].
     pub fn hresult(&self) -> HRESULT { self.error as _ }
+
     pub(crate) fn decomposed(&self) -> Decomposed { Decomposed::from(self.hresult()) }
 }
 
@@ -117,7 +121,7 @@ impl From<HRESULT> for Decomposed {
 
 /// The severity of a given [`HRESULT`] ([`Success`](Severity::Success), [`Informational`](Severity::Informational), [`Warning`](Severity::Warning), or [`Error`](Severity::Error)).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Severity {
+pub(crate) enum Severity {
     Success         /* = 0b00 */,
     Informational   /* = 0b01 */,
     Warning         /* = 0b10 */,

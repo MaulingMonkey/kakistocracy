@@ -22,7 +22,7 @@ use std::ptr::null_mut;
 /// * Using the resulting Device after `window` is destroyed might be UB
 /// * This method [should not be run during the handling of `WM_CREATE`](https://docs.microsoft.com/en-us/windows/win32/api/d3d9/nf-d3d9-idirect3d9-createdevice#remarks).
 /// * Any call to create, release, or reset the device must be done using the same thread as the window procedure of the focus window.
-pub unsafe fn create_device_windowed(d3d: &mcom::Rc<IDirect3D9>, window: &Window) -> Result<mcom::Rc<IDirect3DDevice9>, Error> {
+pub(crate) unsafe fn create_device_windowed(d3d: &mcom::Rc<IDirect3D9>, window: &Window) -> Result<mcom::Rc<IDirect3DDevice9>, Error> {
     let hwnd = window.hwnd().ok_or_else(|| Error::new("d3d9::create_device_windowed", "", 0, "window is not alive"))?;
     let mut pp = default_windowed_presentation_parameters(hwnd);
     let mut device = null_mut();
@@ -37,7 +37,8 @@ pub unsafe fn create_device_windowed(d3d: &mcom::Rc<IDirect3D9>, window: &Window
 /// * Using the resulting Device after `window` is destroyed might be UB
 /// * This method [should not be run during the handling of `WM_CREATE`](https://docs.microsoft.com/en-us/windows/win32/api/d3d9/nf-d3d9-idirect3d9-createdevice#remarks).
 /// * Any call to create, release, or reset the device must be done using the same thread as the window procedure of the focus window.
-pub unsafe fn create_device_ex_windowed(d3d: &mcom::Rc<IDirect3D9Ex>, window: &Window) -> Result<mcom::Rc<IDirect3DDevice9Ex>, Error> {
+#[allow(dead_code)]
+pub(crate) unsafe fn create_device_ex_windowed(d3d: &mcom::Rc<IDirect3D9Ex>, window: &Window) -> Result<mcom::Rc<IDirect3DDevice9Ex>, Error> {
     let hwnd = window.hwnd().ok_or_else(|| Error::new("d3d9::create_device_ex_windowed", "", 0, "window is not alive"))?;
     let mut pp = default_windowed_presentation_parameters(hwnd);
     let mut device = null_mut();

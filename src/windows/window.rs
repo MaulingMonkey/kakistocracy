@@ -1,4 +1,5 @@
-//use crate::utility::*;
+#![allow(dead_code)] // XXX
+
 use crate::windows::*;
 use crate::windows::monitor::MonitorInfo;
 
@@ -27,7 +28,7 @@ use std::rc::*;
 /// Since windows can be closed out from under this handle by external events (OS shutdown, clicking `[X]`, messages, etc.),
 /// this acts somewhat like a weak pointer, and most methods are falliable.
 #[derive(Clone)]
-pub struct Window {
+pub(crate) struct Window {
     hwnd:   HWND,
     unique: Rc<()>,
     assoc:  Weak<Assoc>,
@@ -230,7 +231,7 @@ impl Hash       for Window { fn hash<H: Hasher>(&self, state: &mut H) { self.cmp
 /// Since windows can be closed out from under this handle by external events (OS shutdown, clicking `[X]`, messages, etc.),
 /// this acts somewhat like a weak pointer, and most methods are falliable.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct OwnedWindow(Window);
+pub(crate) struct OwnedWindow(Window);
 
 /// Construction methods
 impl OwnedWindow {
@@ -365,7 +366,8 @@ fn enum_thread_windows<F: FnMut(HWND) -> bool>(dw_thread_id: DWORD, mut f: F) ->
 }
 
 /// Returns `true` if there are any open windows associated with the current thread.
-pub fn any_current_thread_windows() -> bool {
+#[allow(dead_code)]
+pub(crate) fn any_current_thread_windows() -> bool {
     let mut any = false;
     let thread = unsafe { GetCurrentThreadId() };
     enum_thread_windows(thread, |_hwnd| {
