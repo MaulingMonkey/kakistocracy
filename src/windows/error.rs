@@ -17,11 +17,18 @@ pub(crate) fn get_last_error() -> DWORD {
 
 
 
-/// A Win32 error of some sort.
+/// A windows error of some sort.
 ///
-/// This might be an [`HRESULT`](https://www.hresult.info/), or this might be an `ERROR_*` VALUE.
-/// A proper API might segregate the two cases completely, but even Win32 itself sometimes mixes and matches by accident.
-/// As such, this type tries to handle the combined muddle.
+/// Error codes are typically:
+/// * \> `std::u16::MAX` [`HRESULT`](https://www.hresult.info/)s (`E_*`, `XAUDIO2_E_*`, `D3D12_ERROR_*`, [`D3DERR_*`](https://docs.microsoft.com/en-us/windows/win32/direct3d9/d3derr), etc.)
+/// * ≤ `std::u16::MAX` non-`HRESULT` [`ERROR_*`](https://docs.microsoft.com/en-us/windows/win32/debug/system-error-codes)s
+/// * = `0` miscellanious `kakistocracy` errors such as a null pointer or bounds overflows.
+///
+/// A proper Rust API might segregate these cases completely,
+/// but even Win32 itself sometimes mixes and matches some of these cases by accident.
+/// Perfect separation is impossible to accomplish in a forwards-compatible manner,
+/// and difficult to accomplish and verify even ignoring forwards compatability,
+/// so instead this type tries to handle the combined muddle.
 ///
 /// ### See Also
 /// * [System Error Codes](https://docs.microsoft.com/en-us/windows/win32/debug/system-error-codes)
