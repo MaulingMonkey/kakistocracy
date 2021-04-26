@@ -37,7 +37,6 @@ impl Hooks {
     }
 
     unsafe extern "system" fn register_existing_thread_windows(hwnd: HWND, _lparam: LPARAM) -> BOOL {
-        eprintln!("register_existing_thread_windows: {:08p}", hwnd);
         on_hwnd_creating(hwnd);
         EnumChildWindows(hwnd, Some(Self::register_existing_thread_windows), 0)
     }
@@ -49,11 +48,9 @@ impl Hooks {
             let call = &*(lparam as *const CWPSTRUCT); // "The CallWndProc hook procedure can examine the message, but it cannot modify it."
             match call.message {
                 WM_NCCREATE => { // https://docs.microsoft.com/en-us/windows/win32/winmsg/wm-nccreate
-                    eprintln!("WM_NCCREATE: {:08p}", call.hwnd);
                     on_hwnd_creating(call.hwnd);
                 },
                 WM_CREATE => { // https://docs.microsoft.com/en-us/windows/win32/winmsg/wm-create
-                    eprintln!("WM_CREATE:   {:08p}", call.hwnd);
                 //    on_hwnd_creating(call.hwnd);
                 },
                 _other => {},
@@ -69,11 +66,9 @@ impl Hooks {
             let ret = &*(lparam as *const CWPRETSTRUCT);
             match ret.message {
                 WM_DESTROY => { // https://docs.microsoft.com/en-us/windows/win32/winmsg/wm-destroy
-                    eprintln!("WM_DESTROY:   {:08p}", ret.hwnd);
                 //    on_hwnd_destroyed(ret.hwnd);
                 },
                 WM_NCDESTROY => { // https://docs.microsoft.com/en-us/windows/win32/winmsg/wm-ncdestroy
-                    eprintln!("WM_NCDESTROY: {:08p}", ret.hwnd);
                     on_hwnd_destroyed(ret.hwnd);
                 },
                 _other => {},
