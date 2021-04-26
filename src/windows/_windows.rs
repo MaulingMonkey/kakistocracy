@@ -12,7 +12,7 @@ pub use ::winapi;
 
 pub mod error;      pub use error::Error;
 pub mod message;
-pub(crate) mod monitor;
+pub mod monitor;
 pub mod prelude;    pub use prelude::*;
 
 mod com_box;        pub(crate) use com_box::*;
