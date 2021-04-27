@@ -144,9 +144,9 @@ impl Resources {
             MinLOD:         0.0,
             MaxLOD:         D3D11_FLOAT32_MAX,
         }, "kakistocracy::windows::d3d9::sprite::Resources::sampler_state")}.unwrap();
-        let sprite_pixel_shader     = unsafe { device.create_pixel_shader(&include_file!("sprite.ps_4_0.bin")) }.unwrap();
-        let sprite_vertex_shader    = unsafe { device.create_vertex_shader(&include_file!("sprite.vs_4_0.bin")) }.unwrap();
-        let sprite_vertex_layout    = unsafe { device.create_input_layout_from::<sprite::Vertex>(include_file!("sprite.vs_4_0.bin").as_bytes()) }.unwrap();
+        let sprite_pixel_shader     = unsafe { device.create_pixel_shader(&include_file!("sprite.bin.ps_4_0")) }.unwrap();
+        let sprite_vertex_shader    = unsafe { device.create_vertex_shader(&include_file!("sprite.bin.vs_4_0")) }.unwrap();
+        let sprite_vertex_layout    = unsafe { device.create_input_layout_from::<sprite::Vertex>(include_file!("sprite.bin.vs_4_0").as_bytes()) }.unwrap();
         Self { quads_ib, sampler_state, sprite_pixel_shader, sprite_vertex_shader, sprite_vertex_layout }
     }
 }
