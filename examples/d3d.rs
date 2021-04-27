@@ -20,8 +20,21 @@
         start: Instant,
     }
 
-    impl Default for Context {
-        fn default() -> Self { Self { start: Instant::now() } }
+    impl Context {
+        fn new() -> Self { Self { start: Instant::now() } }
+
+        fn sprite_instances(&self, (cw, ch): (u32, u32)) -> impl AsRef<[sprite::Instance]> {
+            let (cw, ch) = (cw as f32, ch as f32);
+            let rot = (Instant::now() - self.start).as_secs_f32();
+
+            [
+                sprite::Instance { anchor: [     10.0,      10.0, 0.0], rotation: 0.0, dimensions: [  0.0 .. 16.0,  0.0 .. 9.0], texcoords: [0.0 .. 1.0, 0.0 .. 1.0] },
+                sprite::Instance { anchor: [cw - 10.0,      10.0, 0.0], rotation: 0.0, dimensions: [-16.0 ..  0.0,  0.0 .. 9.0], texcoords: [0.0 .. 1.0, 0.0 .. 1.0] },
+                sprite::Instance { anchor: [cw - 10.0, ch - 10.0, 0.0], rotation: 0.0, dimensions: [-16.0 ..  0.0, -9.0 .. 0.0], texcoords: [0.0 .. 1.0, 0.0 .. 1.0] },
+                sprite::Instance { anchor: [     10.0, ch - 10.0, 0.0], rotation: 0.0, dimensions: [  0.0 .. 16.0, -9.0 .. 0.0], texcoords: [0.0 .. 1.0, 0.0 .. 1.0] },
+                sprite::Instance { anchor: [cw / 2.0 , ch / 2.0 , 0.0], rotation: rot, dimensions: [-16.0 .. 16.0, -9.0 .. 9.0], texcoords: [0.0 .. 1.0, 0.0 .. 1.0] }, // 2x size
+            ]
+        }
     }
 
     impl kakistocracy::windows::message::Handler for Context {
@@ -35,23 +48,14 @@
 
     impl kakistocracy::windows::d3d9::Render for Context {
         fn render(&self, ctx: &d3d9::RenderArgs) {
-            let (cw, ch) = ctx.client_size();
-            let (cw, ch) = (cw as f32, ch as f32);
-            let dev = &ctx.device;
-            let rot = (Instant::now() - self.start).as_secs_f32();
+            let instances = self.sprite_instances(ctx.client_size());
 
-            let instances = [
-                sprite::Instance { anchor: [     10.0,      10.0, 0.0], rotation: 0.0, dimensions: [  0.0 .. 16.0,  0.0 .. 9.0], texcoords: [0.0 .. 1.0, 0.0 .. 1.0] },
-                sprite::Instance { anchor: [cw - 10.0,      10.0, 0.0], rotation: 0.0, dimensions: [-16.0 ..  0.0,  0.0 .. 9.0], texcoords: [0.0 .. 1.0, 0.0 .. 1.0] },
-                sprite::Instance { anchor: [cw - 10.0, ch - 10.0, 0.0], rotation: 0.0, dimensions: [-16.0 ..  0.0, -9.0 .. 0.0], texcoords: [0.0 .. 1.0, 0.0 .. 1.0] },
-                sprite::Instance { anchor: [     10.0, ch - 10.0, 0.0], rotation: 0.0, dimensions: [  0.0 .. 16.0, -9.0 .. 0.0], texcoords: [0.0 .. 1.0, 0.0 .. 1.0] },
-                sprite::Instance { anchor: [cw / 2.0 , ch / 2.0 , 0.0], rotation: rot, dimensions: [-16.0 .. 16.0, -9.0 .. 9.0], texcoords: [0.0 .. 1.0, 0.0 .. 1.0] }, // 2x size
-            ];
+            let dev = &ctx.device;
 
             ctx.bind().unwrap();
             let _hr = unsafe { dev.Clear(0, null(), D3DCLEAR_TARGET, 0xFF112233, 0.0, 0) };
             let _hr = unsafe { dev.BeginScene() };
-            unsafe { d3d9::sprite::draw(dev, &include_file!("d3d-16x9.png"), &instances[..]) };
+            unsafe { d3d9::sprite::draw(dev, &include_file!("d3d-16x9.png"), instances.as_ref()) };
             let _hr = unsafe { dev.EndScene() };
             let _hr = unsafe { ctx.swap_chain.Present(null(), null(), null_mut(), null(), 0) };
             // XXX: error checking?
@@ -59,14 +63,19 @@
     }
 
     impl kakistocracy::windows::d3d11::Render for Context {
-        fn render(&self, ctx: &d3d11::RenderArgs) {
-            ctx.bind_immediate_context().unwrap();
-            unsafe { ctx.immediate_context.ClearRenderTargetView(ctx.rtv.as_ptr(), &[0.3, 0.2, 0.1, 1.0]) };
-            unsafe { ctx.swap_chain.Present(1, 0) };
+        fn render(&self, args: &d3d11::RenderArgs) {
+            let instances = self.sprite_instances(args.client_size());
+
+            let ctx = &args.immediate_context;
+
+            unsafe { args.bind(ctx) }.unwrap();
+            unsafe { ctx.ClearRenderTargetView(args.rtv.as_ptr(), &[0.3, 0.2, 0.1, 1.0]) };
+            unsafe { d3d11::sprite::draw(ctx, &include_file!("d3d-16x9.png"), instances.as_ref()) };
+            unsafe { args.swap_chain.Present(1, 0) };
         }
     }
 
-    let ctx = Context::default();
+    let ctx = Context::new();
     d3d9 ::create_window_at("wide9",  [ 10.. 10+320,  10.. 10+230], ctx.clone()).unwrap();
     d3d11::create_window_at("wide11", [330..330+320,  10.. 10+230], ctx.clone()).unwrap();
     d3d9 ::create_window_at("tall9",  [ 10.. 10+240, 250..250+320], ctx.clone()).unwrap();

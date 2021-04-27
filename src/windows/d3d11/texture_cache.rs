@@ -128,14 +128,14 @@ impl BasicTextureCache {
 
         let mut tex = null_mut();
         let desc = D3D11_TEXTURE2D_DESC {
-            Width: info.width, Height: info.height, MipLevels: 1, ArraySize: 0,
+            Width: info.width, Height: info.height, MipLevels: 1, ArraySize: 1,
             Format: fmt, SampleDesc: DXGI_SAMPLE_DESC { Count: 1, Quality: 0 },
             Usage: D3D11_USAGE_IMMUTABLE, BindFlags: D3D11_BIND_SHADER_RESOURCE, CPUAccessFlags: 0, MiscFlags: 0,
         };
         let initial_data = D3D11_SUBRESOURCE_DATA {
             pSysMem:            buf.as_ptr().cast(),
             SysMemPitch:        line_size.try_into().unwrap(),
-            SysMemSlicePitch:   0,
+            SysMemSlicePitch:   buf.len().try_into().unwrap(),
         };
         let hr = unsafe { self.device.CreateTexture2D(&desc, &initial_data, &mut tex) };
         let err = Error::check_hr("ID3D11Device::CreateTexture2D", hr, "");
@@ -180,11 +180,11 @@ fn create_texture_rgba_1x1(device: &mcom::Rc<ID3D11Device>, rgba: u32) -> Result
 
     let mut tex = null_mut();
     let desc = D3D11_TEXTURE2D_DESC {
-        Width: 1, Height: 1, MipLevels: 1, ArraySize: 0,
+        Width: 1, Height: 1, MipLevels: 1, ArraySize: 1,
         Format: DXGI_FORMAT_B8G8R8A8_UNORM_SRGB, SampleDesc: DXGI_SAMPLE_DESC { Count: 1, Quality: 0 },
         Usage: D3D11_USAGE_IMMUTABLE, BindFlags: D3D11_BIND_SHADER_RESOURCE, CPUAccessFlags: 0, MiscFlags: 0,
     };
-    let initial_data = D3D11_SUBRESOURCE_DATA { pSysMem: bgra.as_ptr().cast(), SysMemPitch: 4, SysMemSlicePitch: 0 };
+    let initial_data = D3D11_SUBRESOURCE_DATA { pSysMem: bgra.as_ptr().cast(), SysMemPitch: 4, SysMemSlicePitch: 4 };
     let hr = unsafe { device.CreateTexture2D(&desc, &initial_data, &mut tex) };
     Error::check_hr("ID3D11Device::CreateTexture2D", hr, "")?;
     let tex = unsafe { mcom::Rc::from_raw(tex) };

@@ -1,7 +1,6 @@
 use crate::windows::*;
-use crate::windows::d3d9::D3DERR_NOTFOUND;
 
-use winapi::shared::winerror::SUCCEEDED;
+use winapi::shared::winerror::*;
 use winapi::um::unknwnbase::IUnknown;
 use winapi::um::d3d11::*;
 
@@ -23,7 +22,7 @@ pub(crate) fn device_private_data_get_or_insert<T: Any>(device: &mcom::Rc<ID3D11
         assert_eq!(size, std::mem::size_of_val(&unknown) as _, "ID3D11Device::GetPrivateData returned the wrong amount of data for an IUnknown pointer, UB likely");
         let unknown = unsafe { mcom::Rc::borrow(&unknown) };
         UnkWrapRc::from_com_unknown(unknown.as_ref().unwrap()).unwrap()
-    } else if hr == D3DERR_NOTFOUND {
+    } else if hr == DXGI_ERROR_NOT_FOUND {
         let btc = UnkWrapRc::new(f());
         let hr = unsafe { device.SetPrivateDataInterface(&pdguid, btc.to_com_unknown().as_ptr()) };
         assert!(SUCCEEDED(hr), "ID3D11Device::SetPrivateDataInterface failed");
