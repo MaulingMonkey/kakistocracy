@@ -30,8 +30,8 @@ impl<'d> SpriteRenderer<'d> {
         let textures    = d3d9::device_private_data_get_or_insert(device, || BasicTextureCache::new(device.clone()));
         let mut viewport = std::mem::zeroed();
         let _hr = device.GetViewport(&mut viewport);
-        let vx = viewport.X as f32 - 0.5;
-        let vy = viewport.Y as f32 - 0.5;
+        let vx = viewport.X as f32 + 0.5;
+        let vy = viewport.Y as f32 + 0.5;
         let viewport = [
             vx .. (vx + viewport.Width  as f32),
             vy .. (vy + viewport.Height as f32),
