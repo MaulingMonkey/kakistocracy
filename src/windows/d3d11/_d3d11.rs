@@ -2,5 +2,7 @@
 
 #![cfg(feature = "d3d11")]
 
+mod device;                     pub(crate) use device::*;
 pub(crate) mod prelude;         #[allow(unused_imports)] pub(crate) use prelude::*;
 mod mwc;                        pub use mwc::*;
+mod texture_cache;              pub(crate) use texture_cache::*;
