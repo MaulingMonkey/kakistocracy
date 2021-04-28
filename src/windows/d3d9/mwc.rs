@@ -1,4 +1,5 @@
 use crate::windows::*;
+use crate::windows::d3d9::errors::*;
 
 use wchar::wch_c;
 
@@ -120,7 +121,8 @@ impl ThreadLocal {
 
     pub fn lock(&self, allow_no_rendered_windows: bool) -> Option<RenderLock> {
         self.cull_destroyed_windows();
-        let _ = self.try_create_device();
+        if !self.release_lost_devices() .unwrap() { return None; }
+        if !self.try_create_device()    .unwrap() { return None; }
         let dac = self.dac.borrow();
         let dac = dac.as_ref()?;
 
@@ -231,12 +233,50 @@ impl ThreadLocal {
         self.windows.borrow_mut().retain(|&hwnd| hwnd::assoc::valid_window(hwnd));
     }
 
-    pub(crate) fn try_create_device(&self) -> Result<(), Error> {
-        if self.dac.borrow().is_none() {
-            let device = unsafe { d3d9::create_device_windowed(&self.d3d, &self.stub_window)? };
-            *self.dac.borrow_mut() = Some(DeviceAndAssoc { device });
+    pub(crate) fn release_lost_devices(&self) -> Result<bool, Error> {
+        let mut opt_dac = self.dac.borrow_mut();
+        let (release, result) = match opt_dac.as_ref() {
+            None => (false, Ok(true)),
+            Some(dac) => {
+                // https://docs.microsoft.com/en-us/windows/win32/api/d3d9/nf-d3d9-idirect3ddevice9-testcooperativelevel
+                let hr = unsafe { dac.device.TestCooperativeLevel() };
+                match hr {
+                    D3D_OK                      => (false,  Ok(true )), // OK, render away!
+                    D3DERR_DEVICELOST           => (false,  Ok(false)), // Device lost, cannot ID3D11Device::Reset (yet), but we can free everything
+                    D3DERR_DEVICENOTRESET       => (true,   Ok(true )), // Device lost, can    ID3D11Device::Reset, recreate entirely instead for now (I'm lazy)
+                    D3DERR_DRIVERINTERNALERROR  => (true,   Err(Error::new_hr("IDirect3DDevice9::TestCooperativeLevel", hr, "D3DERR_DRIVERINTERNALERROR"))),
+                    ok if SUCCEEDED(ok)         => (false,  Ok(true )), // Odd... a non-D3D_OK success?
+                    _err                        => (true,   Err(Error::new_hr("IDirect3DDevice9::TestCooperativeLevel", hr, ""))),
+                }
+            },
+        };
+        if release {
+            *opt_dac = None;
+            let windows = self.windows.borrow();
+            for assoc in windows.iter().copied().filter_map(|hwnd| hwnd::assoc::get::<WindowAssoc>(hwnd).ok()) {
+                *assoc.swap_chain.borrow_mut() = None;
+            }
         }
-        Ok(())
+        result
+    }
+
+    pub(crate) fn try_create_device(&self) -> Result<bool, Error> {
+        let mut opt_dac = self.dac.borrow_mut();
+        if opt_dac.is_none() {
+            // https://docs.microsoft.com/en-us/windows/win32/api/d3d9/nf-d3d9-idirect3d9-createdevice
+            let device = match unsafe { d3d9::create_device_windowed(&self.d3d, &self.stub_window) } {
+                Ok(device) => device,
+                Err(err) => match err.hresult() {
+                    D3DERR_DEVICELOST               => return Ok(false), // Device lost, cannot create (yet)
+                    D3DERR_INVALIDCALL              => panic!("BUG: expected to be able to create device: {}", err),
+                    D3DERR_NOTAVAILABLE             => return Err(err), // Semi-fatal error, forward
+                    D3DERR_OUTOFVIDEOMEMORY         => return Err(err), // Semi-fatal error, forward
+                    _err                            => return Err(err), // Unknown error, forward
+                },
+            };
+            *opt_dac = Some(DeviceAndAssoc { device });
+        }
+        Ok(true)
     }
 }
 
