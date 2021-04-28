@@ -54,7 +54,7 @@ pub(crate) fn device_private_data_get_or_insert<T: Any>(device: &mcom::Rc<IDirec
         Ok(btc) => UnkWrapRc::from_com_unknown(&btc).unwrap(),
         Err(err) if err.hresult() == D3DERR_NOTFOUND => {
             let btc = UnkWrapRc::new(f());
-            bb.set_private_data_com(&pdguid, &btc.to_com_unknown()).unwrap();
+            unsafe { bb.set_private_data_com(&pdguid, &btc.to_com_unknown()) }.unwrap();
             btc
         },
         Err(err) => panic!("{}", err),

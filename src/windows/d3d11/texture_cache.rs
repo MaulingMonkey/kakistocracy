@@ -5,7 +5,6 @@ use crate::windows::*;
 use winapi::shared::dxgiformat::*;
 use winapi::shared::dxgitype::DXGI_SAMPLE_DESC;
 use winapi::um::d3d11::*;
-use winapi::um::d3dcommon::WKPDID_D3DDebugObjectName;
 
 use std::borrow::Cow;
 use std::cell::RefCell;
@@ -145,11 +144,7 @@ impl BasicTextureCache {
             err?;
         }
         let tex = unsafe { mcom::Rc::from_raw(tex) };
-
-        if cfg!(debug_assertions) {
-            let _debug_name = _debug_name.as_bytes();
-            let _hr = unsafe { tex.SetPrivateData(&WKPDID_D3DDebugObjectName, _debug_name.len().try_into().unwrap(), _debug_name.as_ptr().cast()) };
-        }
+        let _ = unsafe { tex.set_debug_name(_debug_name) };
 
         Ok(Entry2D { texture: tex, error: None })
     }
@@ -188,6 +183,7 @@ fn create_texture_rgba_1x1(device: &mcom::Rc<ID3D11Device>, rgba: u32) -> Result
     let hr = unsafe { device.CreateTexture2D(&desc, &initial_data, &mut tex) };
     Error::check_hr("ID3D11Device::CreateTexture2D", hr, "")?;
     let tex = unsafe { mcom::Rc::from_raw(tex) };
+    let _ = unsafe { tex.set_debug_name(&format!("create_texture_rgba_1x1(device, 0x{:08x})", rgba)) };
 
     Ok(tex)
 }

@@ -86,10 +86,10 @@ pub trait IDirect3DSwapChain9Ext {
 /// Extension methods for [`IDirect3DResource9`](https://docs.microsoft.com/en-us/windows/win32/api/d3d9/nn-d3d9-idirect3dresource9)
 pub trait IDirect3DResource9Ext {
     /// [`IDirect3DResource9::FreePrivateData`](https://docs.microsoft.com/en-us/windows/win32/api/d3d9/nf-d3d9-idirect3dresource9-freeprivatedata)
-    fn free_private_data(&self, guid: &GUID) -> Result<(), Error>;
+    unsafe fn free_private_data(&self, guid: &GUID) -> Result<(), Error>;
 
     /// [`IDirect3DResource9::GetPrivateData`](https://docs.microsoft.com/en-us/windows/win32/api/d3d9/nf-d3d9-idirect3dresource9-getprivatedata)
-    fn get_private_data_raw<'d>(&self, guid: &GUID, data: &'d mut [u8]) -> Result<&'d [u8], Error>;
+    unsafe fn get_private_data_raw<'d>(&self, guid: &GUID, data: &'d mut [u8]) -> Result<&'d [u8], Error>;
 
     /// [`IDirect3DResource9::GetPrivateData`](https://docs.microsoft.com/en-us/windows/win32/api/d3d9/nf-d3d9-idirect3dresource9-getprivatedata),
     /// cast to `*const IUnknown`, and `QueryInterface(...)`ed to `I`.
@@ -100,10 +100,19 @@ pub trait IDirect3DResource9Ext {
     unsafe fn get_private_data_com<I: Interface>(&self, guid: &GUID) -> Result<mcom::Rc<I>, Error>;
 
     /// [`IDirect3DResource9::SetPrivateData`](https://docs.microsoft.com/en-us/windows/win32/api/d3d9/nf-d3d9-idirect3dresource9-setprivatedata) with `Flags = 0`
-    fn set_private_data_raw(&self, guid: &GUID, data: &       [u8]) -> Result<(),       Error>;
+    unsafe fn set_private_data_raw(&self, guid: &GUID, data: &       [u8]) -> Result<(),       Error>;
 
     /// [`IDirect3DResource9::SetPrivateData`](https://docs.microsoft.com/en-us/windows/win32/api/d3d9/nf-d3d9-idirect3dresource9-setprivatedata) with `Flags = D3DSPD_IUNKNOWN`
-    fn set_private_data_com<I: Interface>(&self, guid: &GUID, data: &mcom::Rc<I>) -> Result<(), Error>;
+    unsafe fn set_private_data_com<I: Interface>(&self, guid: &GUID, data: &mcom::Rc<I>) -> Result<(), Error>;
+
+    /// <code>[IDirect3DResource9::SetPrivateData](https://docs.microsoft.com/en-us/windows/win32/api/d3d9/nf-d3d9-idirect3dresource9-setprivatedata)(WKPDID_D3DDebugObjectName, ..., 0)</code>
+    unsafe fn set_debug_name(&self, debug_name: &str) -> Result<(), Error> {
+        if cfg!(debug_assertions) && !debug_name.is_empty() {
+            self.set_private_data_raw(&WKPDID_D3DDebugObjectName, debug_name.as_bytes())
+        } else {
+            Ok(())
+        }
+    }
 }
 
 
@@ -190,24 +199,24 @@ impl IDirect3DSwapChain9Ext for mcom::Rc<IDirect3DSwapChain9> {
     }
 }
 
-impl IDirect3DResource9Ext for mcom::Rc<IDirect3DResource9> {
-    fn free_private_data(&self, guid: &GUID) -> Result<(), Error> {
-        let hr = unsafe { self.FreePrivateData(guid) };
+impl IDirect3DResource9Ext for IDirect3DResource9 {
+    unsafe fn free_private_data(&self, guid: &GUID) -> Result<(), Error> {
+        let hr = self.FreePrivateData(guid);
         Error::check_hr("IDirect3DResource9::FreePrivateData", hr, "")
     }
 
-    fn get_private_data_raw<'d>(&self, guid: &GUID, data: &'d mut [u8]) -> Result<&'d [u8], Error> {
+    unsafe fn get_private_data_raw<'d>(&self, guid: &GUID, data: &'d mut [u8]) -> Result<&'d [u8], Error> {
         let max = DWORD::try_from(data.len()).map_err(|_| Error::new("mcom::Rc<IDirect3DResource9>::get_private_data_raw", "", 0, "data length exceeds DWORD"))?;
         let mut n : DWORD = max;
-        let hr = unsafe { self.GetPrivateData(guid, data.as_mut_ptr().cast(), &mut n) };
+        let hr = self.GetPrivateData(guid, data.as_mut_ptr().cast(), &mut n);
         let read = n.min(max) as usize;
         Error::check_hr("IDirect3DResource9::GetPrivateData", hr, "")?;
         Ok(&data[..read])
     }
 
-    fn set_private_data_raw(&self, guid: &GUID, data: &[u8]) -> Result<(), Error> {
+    unsafe fn set_private_data_raw(&self, guid: &GUID, data: &[u8]) -> Result<(), Error> {
         let n : DWORD = data.len().try_into().map_err(|_| Error::new("mcom::Rc<IDirect3DResource9>::set_private_data_raw", "", 0, "data length exceeds DWORD"))?;
-        let hr = unsafe { self.SetPrivateData(guid, data.as_ptr().cast(), n, 0) };
+        let hr = self.SetPrivateData(guid, data.as_ptr().cast(), n, 0);
         Error::check_hr("IDirect3DResource9::GetPrivateData", hr, "")
     }
 
@@ -225,51 +234,11 @@ impl IDirect3DResource9Ext for mcom::Rc<IDirect3DResource9> {
         Ok(data)
     }
 
-    fn set_private_data_com<I: Interface>(&self, guid: &GUID, data: &mcom::Rc<I>) -> Result<(), Error> {
+    unsafe fn set_private_data_com<I: Interface>(&self, guid: &GUID, data: &mcom::Rc<I>) -> Result<(), Error> {
         // NOTE: SetPrivateData does call data->AddRef()
         const D3DSPD_IUNKNOWN : DWORD = 0x00000001; // C:\Program Files (x86)\Windows Kits\10\Include\10.0.19041.0\shared\d3d9.h
-        let hr = unsafe { self.SetPrivateData(guid, data.as_iunknown_ptr().cast(), std::mem::size_of::<*mut IUnknown>() as DWORD, D3DSPD_IUNKNOWN) };
+        let hr = self.SetPrivateData(guid, data.as_iunknown_ptr().cast(), std::mem::size_of::<*mut IUnknown>() as DWORD, D3DSPD_IUNKNOWN);
         Error::check_hr("IDirect3DResource9::SetPrivateData", hr, "")?;
         Ok(())
     }
-}
-
-impl IDirect3DResource9Ext for mcom::Rc<IDirect3DIndexBuffer9> {
-    fn free_private_data(&self, guid: &GUID) -> Result<(), Error> { self.up_ref().free_private_data(guid) }
-    fn get_private_data_raw<'d>(&self, guid: &GUID, data: &'d mut [u8]) -> Result<&'d [u8], Error> { self.up_ref().get_private_data_raw(guid, data) }
-    fn set_private_data_raw    (&self, guid: &GUID, data: &       [u8]) -> Result<(),       Error> { self.up_ref().set_private_data_raw(guid, data) }
-    unsafe fn get_private_data_com<I: Interface>(&self, guid: &GUID) -> Result<mcom::Rc<I>, Error> { self.up_ref().get_private_data_com(guid) }
-    fn set_private_data_com<I: Interface>(&self, guid: &GUID, data: &mcom::Rc<I>) -> Result<(), Error> { self.up_ref().set_private_data_com(guid, data) }
-}
-
-impl IDirect3DResource9Ext for mcom::Rc<IDirect3DVertexBuffer9> {
-    fn free_private_data(&self, guid: &GUID) -> Result<(), Error> { self.up_ref().free_private_data(guid) }
-    fn get_private_data_raw<'d>(&self, guid: &GUID, data: &'d mut [u8]) -> Result<&'d [u8], Error> { self.up_ref().get_private_data_raw(guid, data) }
-    fn set_private_data_raw    (&self, guid: &GUID, data: &       [u8]) -> Result<(),       Error> { self.up_ref().set_private_data_raw(guid, data) }
-    unsafe fn get_private_data_com<I: Interface>(&self, guid: &GUID) -> Result<mcom::Rc<I>, Error> { self.up_ref().get_private_data_com(guid) }
-    fn set_private_data_com<I: Interface>(&self, guid: &GUID, data: &mcom::Rc<I>) -> Result<(), Error> { self.up_ref().set_private_data_com(guid, data) }
-}
-
-impl IDirect3DResource9Ext for mcom::Rc<IDirect3DSurface9> {
-    fn free_private_data(&self, guid: &GUID) -> Result<(), Error> { self.up_ref().free_private_data(guid) }
-    fn get_private_data_raw<'d>(&self, guid: &GUID, data: &'d mut [u8]) -> Result<&'d [u8], Error> { self.up_ref().get_private_data_raw(guid, data) }
-    fn set_private_data_raw    (&self, guid: &GUID, data: &       [u8]) -> Result<(),       Error> { self.up_ref().set_private_data_raw(guid, data) }
-    unsafe fn get_private_data_com<I: Interface>(&self, guid: &GUID) -> Result<mcom::Rc<I>, Error> { self.up_ref().get_private_data_com(guid) }
-    fn set_private_data_com<I: Interface>(&self, guid: &GUID, data: &mcom::Rc<I>) -> Result<(), Error> { self.up_ref().set_private_data_com(guid, data) }
-}
-
-impl IDirect3DResource9Ext for mcom::Rc<IDirect3DBaseTexture9> {
-    fn free_private_data(&self, guid: &GUID) -> Result<(), Error> { self.up_ref().free_private_data(guid) }
-    fn get_private_data_raw<'d>(&self, guid: &GUID, data: &'d mut [u8]) -> Result<&'d [u8], Error> { self.up_ref().get_private_data_raw(guid, data) }
-    fn set_private_data_raw    (&self, guid: &GUID, data: &       [u8]) -> Result<(),       Error> { self.up_ref().set_private_data_raw(guid, data) }
-    unsafe fn get_private_data_com<I: Interface>(&self, guid: &GUID) -> Result<mcom::Rc<I>, Error> { self.up_ref().get_private_data_com(guid) }
-    fn set_private_data_com<I: Interface>(&self, guid: &GUID, data: &mcom::Rc<I>) -> Result<(), Error> { self.up_ref().set_private_data_com(guid, data) }
-}
-
-impl IDirect3DResource9Ext for mcom::Rc<IDirect3DTexture9> {
-    fn free_private_data(&self, guid: &GUID) -> Result<(), Error> { self.up_ref().free_private_data(guid) }
-    fn get_private_data_raw<'d>(&self, guid: &GUID, data: &'d mut [u8]) -> Result<&'d [u8], Error> { self.up_ref().get_private_data_raw(guid, data) }
-    fn set_private_data_raw    (&self, guid: &GUID, data: &       [u8]) -> Result<(),       Error> { self.up_ref().set_private_data_raw(guid, data) }
-    unsafe fn get_private_data_com<I: Interface>(&self, guid: &GUID) -> Result<mcom::Rc<I>, Error> { self.up_ref().get_private_data_com(guid) }
-    fn set_private_data_com<I: Interface>(&self, guid: &GUID, data: &mcom::Rc<I>) -> Result<(), Error> { self.up_ref().set_private_data_com(guid, data) }
 }

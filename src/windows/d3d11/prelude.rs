@@ -64,10 +64,18 @@ pub trait ID3D11DeviceExt {
 /// Extension methods for [`ID3D11DeviceChild`](https://docs.microsoft.com/en-us/windows/win32/api/d3d11/nn-d3d11-id3d11devicechild)
 pub trait ID3D11DeviceChildExt {
     /// [`ID3D11DeviceChild::GetDevice`](https://docs.microsoft.com/en-us/windows/win32/api/d3d11/nf-d3d11-id3d11devicechild-getdevice)
-    fn get_device(&self) -> mcom::Rc<ID3D11Device>;
+    ///
+    /// ### Safety
+    /// Undefined behavior might result if:
+    /// * `self` is not a valid `ID3D11DeviceChild`
+    unsafe fn get_device(&self) -> mcom::Rc<ID3D11Device>;
 
     /// [`ID3D11DeviceChild::SetPrivateData`](https://docs.microsoft.com/en-us/windows/win32/api/d3d11/nf-d3d11-id3d11devicechild-setprivatedata)(...)
-    fn set_debug_name(&self, debug_name: &str) -> Result<(), Error>;
+    ///
+    /// ### Safety
+    /// Undefined behavior might result if:
+    /// * `self` is not a valid `ID3D11DeviceChild`
+    unsafe fn set_debug_name(&self, debug_name: &str) -> Result<(), Error>;
 }
 
 
@@ -156,60 +164,20 @@ impl ID3D11DeviceExt for mcom::Rc<ID3D11Device> {
     }
 }
 
-impl ID3D11DeviceChildExt for mcom::Rc<ID3D11DeviceChild> {
-    fn get_device(&self) -> mcom::Rc<ID3D11Device> {
+impl ID3D11DeviceChildExt for ID3D11DeviceChild {
+    unsafe fn get_device(&self) -> mcom::Rc<ID3D11Device> {
         let mut device = null_mut();
-        unsafe { self.GetDevice(&mut device) };
-        unsafe { mcom::Rc::from_raw(device) }
+        self.GetDevice(&mut device);
+        mcom::Rc::from_raw(device)
     }
 
-    fn set_debug_name(&self, debug_name: &str) -> Result<(), Error> {
+    unsafe fn set_debug_name(&self, debug_name: &str) -> Result<(), Error> {
         if cfg!(debug_assertions) && !debug_name.is_empty() {
             let debug_name = debug_name.as_bytes();
-            let hr = unsafe { self.SetPrivateData(&WKPDID_D3DDebugObjectName, debug_name.len() as _, debug_name.as_ptr().cast()) };
+            let hr = self.SetPrivateData(&WKPDID_D3DDebugObjectName, debug_name.len() as _, debug_name.as_ptr().cast());
             Error::check_hr("ID3D11DeviceChild::SetPrivateData", hr, "setting WKPDID_D3DDebugObjectName")
         } else {
             Ok(())
         }
     }
-}
-
-impl ID3D11DeviceChildExt for mcom::Rc<ID3D11DeviceContext> {
-    fn get_device(&self) -> mcom::Rc<ID3D11Device> { self.up_ref().get_device() }
-    fn set_debug_name(&self, debug_name: &str) -> Result<(), Error> { self.up_ref().set_debug_name(debug_name) }
-}
-
-impl ID3D11DeviceChildExt for mcom::Rc<ID3D11Resource> {
-    fn get_device(&self) -> mcom::Rc<ID3D11Device> { self.up_ref().get_device() }
-    fn set_debug_name(&self, debug_name: &str) -> Result<(), Error> { self.up_ref().set_debug_name(debug_name) }
-}
-
-impl ID3D11DeviceChildExt for mcom::Rc<ID3D11Buffer> {
-    fn get_device(&self) -> mcom::Rc<ID3D11Device> { self.up_ref().get_device() }
-    fn set_debug_name(&self, debug_name: &str) -> Result<(), Error> { self.up_ref().set_debug_name(debug_name) }
-}
-
-impl ID3D11DeviceChildExt for mcom::Rc<ID3D11Texture2D> {
-    fn get_device(&self) -> mcom::Rc<ID3D11Device> { self.up_ref().get_device() }
-    fn set_debug_name(&self, debug_name: &str) -> Result<(), Error> { self.up_ref().set_debug_name(debug_name) }
-}
-
-impl ID3D11DeviceChildExt for mcom::Rc<ID3D11PixelShader> {
-    fn get_device(&self) -> mcom::Rc<ID3D11Device> { self.up_ref().get_device() }
-    fn set_debug_name(&self, debug_name: &str) -> Result<(), Error> { self.up_ref().set_debug_name(debug_name) }
-}
-
-impl ID3D11DeviceChildExt for mcom::Rc<ID3D11VertexShader> {
-    fn get_device(&self) -> mcom::Rc<ID3D11Device> { self.up_ref().get_device() }
-    fn set_debug_name(&self, debug_name: &str) -> Result<(), Error> { self.up_ref().set_debug_name(debug_name) }
-}
-
-impl ID3D11DeviceChildExt for mcom::Rc<ID3D11InputLayout> {
-    fn get_device(&self) -> mcom::Rc<ID3D11Device> { self.up_ref().get_device() }
-    fn set_debug_name(&self, debug_name: &str) -> Result<(), Error> { self.up_ref().set_debug_name(debug_name) }
-}
-
-impl ID3D11DeviceChildExt for mcom::Rc<ID3D11SamplerState> {
-    fn get_device(&self) -> mcom::Rc<ID3D11Device> { self.up_ref().get_device() }
-    fn set_debug_name(&self, debug_name: &str) -> Result<(), Error> { self.up_ref().set_debug_name(debug_name) }
 }

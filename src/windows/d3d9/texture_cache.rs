@@ -4,7 +4,6 @@ use crate::windows::*;
 
 use winapi::shared::d3d9::*;
 use winapi::shared::d3d9types::*;
-use winapi::um::d3dcommon::WKPDID_D3DDebugObjectName;
 
 use std::borrow::Cow;
 use std::cell::RefCell;
@@ -152,9 +151,7 @@ impl BasicTextureCache {
         let hr = unsafe { tex.UnlockRect(0) };
         Error::check_hr("IDirect3DTexture9::UnlockRect", hr, "")?;
 
-        if cfg!(debug_assertions) {
-            let _ = tex.set_private_data_raw(&WKPDID_D3DDebugObjectName, _debug_name.as_bytes());
-        }
+        let _ = unsafe { tex.set_debug_name(_debug_name) };
 
         Ok(Entry2D { texture: tex, error: None })
     }
@@ -187,6 +184,7 @@ fn create_texture_rgba_1x1(device: &mcom::Rc<IDirect3DDevice9>, rgba: u32) -> Re
     let hr = unsafe { device.CreateTexture(1, 1, 1, D3DUSAGE_DYNAMIC, D3DFMT_A8R8G8B8, D3DPOOL_DEFAULT, &mut tex, null_mut()) };
     Error::check_hr("IDirect3DDevice9::CreateTexture", hr, "")?;
     let tex = unsafe { mcom::Rc::from_raw(tex) };
+    let _ = unsafe { tex.set_debug_name(&format!("create_texture_rgba_1x1(device, 0x{:08x})", rgba)) };
 
     let mut lock = unsafe { std::mem::zeroed() };
     let hr = unsafe { tex.LockRect(0, &mut lock, null(), D3DLOCK_DISCARD) };
