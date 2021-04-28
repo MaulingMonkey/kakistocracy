@@ -204,10 +204,6 @@ impl MonitorSelectorInfo {
     {
         let mut monitors = MonitorSelectorInfo::collect();
 
-        let primary = monitors.iter().find(|m| m.is_primary()).unwrap().clone();
-
-        if monitors.len() < 2 { return primary; }
-
         monitors.sort_by_key(key_fn);
         let (primary_idx, _primary_msi) = monitors.iter().enumerate().find(|(_idx, msi)| msi.is_primary()).unwrap();
 
