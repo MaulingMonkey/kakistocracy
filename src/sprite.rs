@@ -2,8 +2,9 @@
 //!
 //! ### See Also
 //! *   [crate::windows::d3d9::sprite]
+//! *   [crate::windows::d3d11::sprite]
 
-#![cfg_attr(not(all(windows, feature = "d3d9")), allow(dead_code))]
+#![cfg_attr(not(all(windows, any(feature = "d3d9", feature = "d3d11"))), allow(dead_code))]
 
 use std::ops::*;
 
