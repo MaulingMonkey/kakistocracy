@@ -184,7 +184,6 @@ pub(crate) mod private {
 }
 
 #[derive(Clone, Copy)] struct MonitorSelectorInfo {
-    idx:    usize,
     area:   RECT,
     cx:     LONG,
     cy:     LONG,
@@ -192,12 +191,9 @@ pub(crate) mod private {
 
 impl MonitorSelectorInfo {
     fn collect() -> Vec<Self> {
-        let mut idx = 0;
         collect_display_monitors((), None, |_monitor, _dc, &area| {
             let (cx, cy) = area.center();
-            let r = Self { idx, area, cx, cy };
-            idx += 1;
-            r
+            Self { area, cx, cy }
         })
     }
 
@@ -208,14 +204,12 @@ impl MonitorSelectorInfo {
     {
         let mut monitors = MonitorSelectorInfo::collect();
 
-        let primary = monitors[0];
-        assert_eq!(0, primary.area.top);
-        assert_eq!(0, primary.area.left);
+        let primary = monitors.iter().find(|m| m.is_primary()).unwrap().clone();
 
         if monitors.len() < 2 { return primary; }
 
         monitors.sort_by_key(key_fn);
-        let primary_idx = monitors.iter().enumerate().find(|(_idx, msi)| msi.idx == 0).unwrap().0;
+        let (primary_idx, _primary_msi) = monitors.iter().enumerate().find(|(_idx, msi)| msi.is_primary()).unwrap();
 
         let idx = if order < 0 {
             primary_idx.saturating_sub(-order as usize).max(0)
@@ -225,4 +219,6 @@ impl MonitorSelectorInfo {
 
         monitors[idx]
     }
+
+    fn is_primary(&self) -> bool { self.area.left == 0 && self.area.top == 0 }
 }
