@@ -2,8 +2,8 @@
 
 pub use crate::sprite::*;
 
+use crate::*;
 use crate::io::StaticFile;
-use crate::sprite;
 use crate::windows::*;
 use crate::windows::d3d9::{BasicTextureCache, Vertex};
 
@@ -14,6 +14,17 @@ use winapi::shared::minwindef::UINT;
 use std::convert::*;
 use std::ops::Range;
 use std::ptr::*;
+
+
+
+/// Render `instances` of `texture` to `device`
+///
+/// ### Safety
+/// * `device`'s render target 0 is expected to be valid/bound
+/// * `device`'s viewport is expected to be valid/bound
+pub unsafe fn draw(device: &mcom::Rc<IDirect3DDevice9>, texture: &StaticFile, instances: &[Instance]) {
+    SpriteRenderer::new(device).draw(texture, instances)
+}
 
 
 
@@ -97,12 +108,6 @@ impl<'d> SpriteRenderer<'d> {
     }
 }
 
-/// ### Safety
-/// * ???
-pub unsafe fn draw(device: &mcom::Rc<IDirect3DDevice9>, texture: &StaticFile, instances: &[Instance]) {
-    SpriteRenderer::new(device).draw(texture, instances)
-}
-
 unsafe impl d3d9::Vertex for sprite::Vertex {
     type Decl = &'static [D3DVERTEXELEMENT9];
 
@@ -112,8 +117,6 @@ unsafe impl d3d9::Vertex for sprite::Vertex {
         D3DDECL_END,
     ][..] }
 }
-
-
 
 struct Resources {
     quads_ib:               mcom::Rc<IDirect3DIndexBuffer9>,

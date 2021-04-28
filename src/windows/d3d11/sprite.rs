@@ -18,6 +18,17 @@ use std::ptr::*;
 
 
 
+/// Render `instances` of `texture` to `context`
+///
+/// ### Safety
+/// * `context`'s render target 0 is expected to be valid/bound
+/// * `context`'s viewport 0 is expected to be valid/bound
+pub unsafe fn draw(context: &mcom::Rc<ID3D11DeviceContext>, texture: &StaticFile, instances: &[Instance]) {
+    SpriteRenderer::new(context).draw(texture, instances)
+}
+
+
+
 struct SpriteRenderer<'d> {
     context:    &'d mcom::Rc<ID3D11DeviceContext>,
     device:     mcom::Rc<ID3D11Device>,
@@ -103,12 +114,6 @@ impl<'d> SpriteRenderer<'d> {
     }
 }
 
-/// ### Safety
-/// * ???
-pub unsafe fn draw(context: &mcom::Rc<ID3D11DeviceContext>, texture: &StaticFile, instances: &[Instance]) {
-    SpriteRenderer::new(context).draw(texture, instances)
-}
-
 unsafe impl d3d11::Vertex for sprite::Vertex {
     type Decl = [D3D11_INPUT_ELEMENT_DESC; 2];
 
@@ -117,8 +122,6 @@ unsafe impl d3d11::Vertex for sprite::Vertex {
         D3D11_INPUT_ELEMENT_DESC { SemanticName: b"TEXCOORD\0".as_ptr().cast(), SemanticIndex: 0, Format: DXGI_FORMAT_R32G32_FLOAT,       InputSlot: 0, AlignedByteOffset: 16, InputSlotClass: D3D11_INPUT_PER_VERTEX_DATA, InstanceDataStepRate: 0 },
     ]}
 }
-
-
 
 struct Resources {
     quads_ib:               mcom::Rc<ID3D11Buffer>,
