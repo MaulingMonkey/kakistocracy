@@ -19,10 +19,6 @@ use std::ptr::null_mut;
 
 
 
-pub trait CreateFromDevice {
-    fn new(device: &mcom::Rc<ID3D11Device>) -> Self;
-}
-
 pub trait Render {
     fn render(&self, args: &RenderArgs);
 }

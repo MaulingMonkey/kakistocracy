@@ -15,14 +15,6 @@ use std::ptr::null_mut;
 
 
 
-pub trait CreateFromDevice {
-    fn new(device: &mcom::Rc<IDirect3DDevice9>) -> Self;
-}
-
-impl<T: From<mcom::Rc<IDirect3DDevice9>>> CreateFromDevice for T {
-    fn new(device: &mcom::Rc<IDirect3DDevice9>) -> Self { Self::from(device.clone()) }
-}
-
 pub trait Render {
     fn render(&self, args: &RenderArgs);
 }
