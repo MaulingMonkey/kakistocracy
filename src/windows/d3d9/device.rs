@@ -46,15 +46,15 @@ pub(crate) unsafe fn create_device_ex_windowed(d3d: &mcom::Rc<IDirect3D9Ex>, win
     mcom::Rc::from_raw_opt(device).ok_or(Error::new_hr("IDirect3D9Ex::CreateDeviceEx", hr, "IDirect3DDevice9Ex is null"))
 }
 
-pub(crate) fn device_private_data_get_or_insert<T: Any>(device: &mcom::Rc<IDirect3DDevice9>, f: impl FnOnce() -> T) -> UnkWrapRc<T> {
+pub(crate) unsafe fn device_private_data_get_or_insert<T: Any>(device: &IDirect3DDevice9, f: impl FnOnce() -> T) -> UnkWrapRc<T> {
     struct DevicePrivateData<T: Any>(PhantomData<T>);
     let pdguid = type_guid::<DevicePrivateData::<T>>();
-    let bb = unsafe { device.get_back_buffer(0, 0) }.unwrap();
-    match unsafe { bb.get_private_data_com::<IUnknown>(&pdguid) } {
+    let bb = device.get_back_buffer(0, 0).unwrap();
+    match bb.get_private_data_com::<IUnknown>(&pdguid) {
         Ok(btc) => UnkWrapRc::from_com_unknown(&btc).unwrap(),
         Err(err) if err.hresult() == D3DERR_NOTFOUND => {
             let btc = UnkWrapRc::new(f());
-            unsafe { bb.set_private_data_com(&pdguid, &btc.to_com_unknown()) }.unwrap();
+            bb.set_private_data_com(&pdguid, &btc.to_com_unknown()).unwrap();
             btc
         },
         Err(err) => panic!("{}", err),

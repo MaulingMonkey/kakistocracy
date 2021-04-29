@@ -18,16 +18,22 @@ use std::ptr::*;
 
 
 
-impl private::RenderTarget for &mcom::Rc<ID3D11DeviceContext> {
+impl private::RenderTarget for &ID3D11DeviceContext {
     unsafe fn render1(&mut self, texture: &StaticFile, instances: &[Instance]) {
         SpriteRenderer::new(self).draw(texture, instances)
+    }
+}
+
+impl private::RenderTarget for &mcom::Rc<ID3D11DeviceContext> {
+    unsafe fn render1(&mut self, texture: &StaticFile, instances: &[Instance]) {
+        SpriteRenderer::new(&**self).draw(texture, instances)
     }
 }
 
 
 
 struct SpriteRenderer<'d> {
-    context:    &'d mcom::Rc<ID3D11DeviceContext>,
+    context:    &'d ID3D11DeviceContext,
     device:     mcom::Rc<ID3D11Device>,
     viewport:   [Range<f32>; 2],
     textures:   UnkWrapRc<BasicTextureCache>,
@@ -35,7 +41,7 @@ struct SpriteRenderer<'d> {
 }
 
 impl<'d> SpriteRenderer<'d> {
-    pub unsafe fn new(context: &'d mcom::Rc<ID3D11DeviceContext>) -> Self {
+    pub unsafe fn new(context: &'d ID3D11DeviceContext) -> Self {
         let device = context.get_device();
         let resources   = d3d11::device_private_data_get_or_insert(&device, || Resources::new(&device));
         let textures    = d3d11::device_private_data_get_or_insert(&device, || BasicTextureCache::new(device.clone()));

@@ -17,25 +17,31 @@ use std::ptr::*;
 
 
 
-impl private::RenderTarget for &mcom::Rc<IDirect3DDevice9> {
+impl private::RenderTarget for &IDirect3DDevice9 {
     unsafe fn render1(&mut self, texture: &StaticFile, instances: &[Instance]) {
         SpriteRenderer::new(self).draw(texture, instances)
+    }
+}
+
+impl private::RenderTarget for &mcom::Rc<IDirect3DDevice9> {
+    unsafe fn render1(&mut self, texture: &StaticFile, instances: &[Instance]) {
+        SpriteRenderer::new(&**self).draw(texture, instances)
     }
 }
 
 
 
 struct SpriteRenderer<'d> {
-    device:     &'d mcom::Rc<IDirect3DDevice9>,
+    device:     &'d IDirect3DDevice9,
     viewport:   [Range<f32>; 2],
     textures:   UnkWrapRc<BasicTextureCache>,
     resources:  UnkWrapRc<Resources>,
 }
 
 impl<'d> SpriteRenderer<'d> {
-    pub unsafe fn new(device: &'d mcom::Rc<IDirect3DDevice9>) -> Self {
+    pub unsafe fn new(device: &'d IDirect3DDevice9) -> Self {
         let resources   = d3d9::device_private_data_get_or_insert(device, || Resources::new(device));
-        let textures    = d3d9::device_private_data_get_or_insert(device, || BasicTextureCache::new(device.clone()));
+        let textures    = d3d9::device_private_data_get_or_insert(device, || BasicTextureCache::new(device));
         let mut viewport = std::mem::zeroed();
         let _hr = device.GetViewport(&mut viewport);
         let vx = viewport.X as f32 + 0.5;
@@ -121,10 +127,10 @@ struct Resources {
 }
 
 impl Resources {
-    fn new(device: &mcom::Rc<IDirect3DDevice9>) -> Self {
+    unsafe fn new(device: &IDirect3DDevice9) -> Self {
         let indicies            = create_quads_index_data(std::u16::MAX/4);
-        let quads_ib            = unsafe { device.create_index_buffer_from(D3DUSAGE_DYNAMIC, D3DPOOL_DEFAULT, &indicies[..], "kakistocracy::windows::d3d9::sprite::Resources::quads_ib") }.unwrap();
-        let sprite_vertex_vdecl = unsafe { device.create_vertex_decl_from::<sprite::Vertex>() }.unwrap();
+        let quads_ib            = device.create_index_buffer_from(D3DUSAGE_DYNAMIC, D3DPOOL_DEFAULT, &indicies[..], "kakistocracy::windows::d3d9::sprite::Resources::quads_ib").unwrap();
+        let sprite_vertex_vdecl = device.create_vertex_decl_from::<sprite::Vertex>().unwrap();
         Self { quads_ib, sprite_vertex_vdecl }
     }
 }

@@ -9,7 +9,6 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::*;
 use std::io::{self, Read};
-use std::ops::*;
 use std::path::*;
 use std::ptr::*;
 use std::time::SystemTime;
@@ -29,16 +28,11 @@ pub(crate) struct BasicTextureCache {
 }
 
 impl BasicTextureCache {
-    #[allow(dead_code)]
-    pub fn get(device: &mcom::Rc<IDirect3DDevice9>) -> impl Deref<Target = Self> {
-        d3d9::device_private_data_get_or_insert(device, || BasicTextureCache::new(device.clone()))
-    }
-
-    pub fn new(device: mcom::Rc<IDirect3DDevice9>) -> Self {
-        let placeholder_2d_error    = create_texture_rgba_1x1(&device, 0xFF00FFFF).unwrap();
-        let placeholder_2d_missing  = create_texture_rgba_1x1(&device, 0xFF00FFFF).unwrap();
+    pub unsafe fn new(device: &IDirect3DDevice9) -> Self {
+        let placeholder_2d_error    = create_texture_rgba_1x1(device, 0xFF00FFFF).unwrap();
+        let placeholder_2d_missing  = create_texture_rgba_1x1(device, 0xFF00FFFF).unwrap();
         Self {
-            device,
+            device: mcom::Rc::borrow_ref(&device).clone(),
             placeholder_2d_error,
             placeholder_2d_missing,
             static_files:   Default::default(),
@@ -158,7 +152,7 @@ impl BasicTextureCache {
 }
 
 impl From<mcom::Rc<IDirect3DDevice9>> for BasicTextureCache {
-    fn from(device: mcom::Rc<IDirect3DDevice9>) -> Self { Self::new(device) }
+    fn from(device: mcom::Rc<IDirect3DDevice9>) -> Self { unsafe { Self::new(&device) } }
 }
 
 
@@ -176,23 +170,23 @@ struct Dynamic<C> {
     last_mod_time:  SystemTime,
 }
 
-fn create_texture_rgba_1x1(device: &mcom::Rc<IDirect3DDevice9>, rgba: u32) -> Result<mcom::Rc<IDirect3DTexture9>, Error> {
+unsafe fn create_texture_rgba_1x1(device: &IDirect3DDevice9, rgba: u32) -> Result<mcom::Rc<IDirect3DTexture9>, Error> {
     let [r, g, b, a] = rgba.to_le_bytes();
     let argb = u32::from_le_bytes([a, r, g, b]);
 
     let mut tex = null_mut();
-    let hr = unsafe { device.CreateTexture(1, 1, 1, D3DUSAGE_DYNAMIC, D3DFMT_A8R8G8B8, D3DPOOL_DEFAULT, &mut tex, null_mut()) };
+    let hr = device.CreateTexture(1, 1, 1, D3DUSAGE_DYNAMIC, D3DFMT_A8R8G8B8, D3DPOOL_DEFAULT, &mut tex, null_mut());
     Error::check_hr("IDirect3DDevice9::CreateTexture", hr, "")?;
-    let tex = unsafe { mcom::Rc::from_raw(tex) };
-    let _ = unsafe { tex.set_debug_name(&format!("create_texture_rgba_1x1(device, 0x{:08x})", rgba)) };
+    let tex = mcom::Rc::from_raw(tex);
+    let _ = tex.set_debug_name(&format!("create_texture_rgba_1x1(device, 0x{:08x})", rgba));
 
-    let mut lock = unsafe { std::mem::zeroed() };
-    let hr = unsafe { tex.LockRect(0, &mut lock, null(), D3DLOCK_DISCARD) };
+    let mut lock = std::mem::zeroed();
+    let hr = tex.LockRect(0, &mut lock, null(), D3DLOCK_DISCARD);
     Error::check_hr("IDirect3DTexture9::LockRect", hr, "")?;
 
-    unsafe { std::ptr::write_unaligned(lock.pBits.cast(), argb) };
+    std::ptr::write_unaligned(lock.pBits.cast(), argb);
 
-    let hr = unsafe { tex.UnlockRect(0) };
+    let hr = tex.UnlockRect(0);
     Error::check_hr("IDirect3DTexture9::UnlockRect", hr, "")?;
 
     Ok(tex)
