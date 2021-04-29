@@ -20,8 +20,8 @@ pub(crate) fn device_private_data_get_or_insert<T: Any>(device: &mcom::Rc<ID3D11
     let hr = unsafe { device.GetPrivateData(&pdguid, &mut size, (&mut unknown as *mut *mut IUnknown).cast()) };
     if SUCCEEDED(hr) {
         assert_eq!(size, std::mem::size_of_val(&unknown) as _, "ID3D11Device::GetPrivateData returned the wrong amount of data for an IUnknown pointer, UB likely");
-        let unknown = unsafe { mcom::Rc::borrow(&unknown) };
-        UnkWrapRc::from_com_unknown(unknown.as_ref().unwrap()).unwrap()
+        let unknown = unsafe { mcom::Rc::borrow_ptr(&unknown) };
+        UnkWrapRc::from_com_unknown(unknown).unwrap()
     } else if hr == DXGI_ERROR_NOT_FOUND {
         let btc = UnkWrapRc::new(f());
         let hr = unsafe { device.SetPrivateDataInterface(&pdguid, btc.to_com_unknown().as_ptr()) };

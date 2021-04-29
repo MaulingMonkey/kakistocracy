@@ -124,7 +124,7 @@ impl Resources {
     fn new(device: &mcom::Rc<IDirect3DDevice9>) -> Self {
         let indicies            = create_quads_index_data(std::u16::MAX/4);
         let quads_ib            = unsafe { device.create_index_buffer_from(D3DUSAGE_DYNAMIC, D3DPOOL_DEFAULT, &indicies[..], "kakistocracy::windows::d3d9::sprite::Resources::quads_ib") }.unwrap();
-        let sprite_vertex_vdecl = device.create_vertex_decl_from::<sprite::Vertex>().unwrap();
+        let sprite_vertex_vdecl = unsafe { device.create_vertex_decl_from::<sprite::Vertex>() }.unwrap();
         Self { quads_ib, sprite_vertex_vdecl }
     }
 }

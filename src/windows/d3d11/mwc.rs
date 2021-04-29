@@ -141,7 +141,7 @@ impl ThreadLocal {
                 Some(_) | None => {
                     *wa_swap_chain_rtv = None; // release previous swap chain before creating a new one
 
-                    let dxgi_device     = dac.device.to_dxgi_device();
+                    let dxgi_device     = unsafe { dac.device.to_dxgi_device() };
                     let dxgi_adapter    = dxgi_device.get_parent_dxgi_adapter().unwrap();
                     let dxgi_factory    = dxgi_adapter.get_parent_dxgi_factory().unwrap();
                     let bb_format       = DXGI_FORMAT_B8G8R8A8_UNORM;
@@ -171,7 +171,7 @@ impl ThreadLocal {
                     };
 
                     let bb = swap_chain.get_buffer::<ID3D11Resource>(0).unwrap();
-                    let rtv = dac.device.create_render_target_view_from_resource(&bb).unwrap();
+                    let rtv = unsafe { dac.device.create_render_target_view_from_resource(&bb) }.unwrap();
 
                     *wa_swap_chain_rtv = Some((swap_chain.clone(), rtv.clone()));
                     (swap_chain, rtv)

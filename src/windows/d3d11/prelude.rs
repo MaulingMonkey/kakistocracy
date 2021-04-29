@@ -15,10 +15,10 @@ use std::ptr::*;
 /// Extension methods for [`ID3D11Device`](https://docs.microsoft.com/en-us/windows/win32/api/d3d11/nn-d3d11-id3d11device)
 pub trait ID3D11DeviceExt {
     /// <code>[IUnknown::QueryInterface](https://docs.microsoft.com/en-us/windows/win32/api/unknwn/nf-unknwn-iunknown-queryinterface(refiid_void))(__uuidof([IDXGIDevice](https://docs.microsoft.com/en-us/windows/win32/api/dxgi/nn-dxgi-idxgidevice)), ...)</code>
-    fn to_dxgi_device(&self) -> mcom::Rc<IDXGIDevice>;
+    unsafe fn to_dxgi_device(&self) -> mcom::Rc<IDXGIDevice>;
 
     /// [`ID3D11Device::CreateRenderTargetView`](https://docs.microsoft.com/en-us/windows/win32/api/d3d11/nf-d3d11-id3d11device-createrendertargetview)
-    fn create_render_target_view_from_resource(&self, resource: &mcom::Rc<ID3D11Resource>) -> Result<mcom::Rc<ID3D11RenderTargetView>, Error>;
+    unsafe fn create_render_target_view_from_resource(&self, resource: &mcom::Rc<ID3D11Resource>) -> Result<mcom::Rc<ID3D11RenderTargetView>, Error>;
 
     /// [`ID3D11Device::CreateRenderTargetView`](https://docs.microsoft.com/en-us/windows/win32/api/d3d11/nf-d3d11-id3d11device-createrendertargetview)
     ///
@@ -80,15 +80,15 @@ pub trait ID3D11DeviceChildExt {
 
 
 
-impl ID3D11DeviceExt for mcom::Rc<ID3D11Device> {
-    fn to_dxgi_device(&self) -> mcom::Rc<IDXGIDevice> {
-        self.try_cast::<IDXGIDevice>().unwrap()
+impl ID3D11DeviceExt for ID3D11Device {
+    unsafe fn to_dxgi_device(&self) -> mcom::Rc<IDXGIDevice> {
+        mcom::Rc::borrow_ref(&self).try_cast::<IDXGIDevice>().unwrap()
     }
 
-    fn create_render_target_view_from_resource(&self, resource: &mcom::Rc<ID3D11Resource>) -> Result<mcom::Rc<ID3D11RenderTargetView>, Error> {
+    unsafe fn create_render_target_view_from_resource(&self, resource: &mcom::Rc<ID3D11Resource>) -> Result<mcom::Rc<ID3D11RenderTargetView>, Error> {
         let mut rtv = null_mut();
-        let hr = unsafe { self.CreateRenderTargetView(resource.as_ptr(), null_mut(), &mut rtv) };
-        let rtv = unsafe { mcom::Rc::from_raw_opt(rtv) };
+        let hr = self.CreateRenderTargetView(resource.as_ptr(), null_mut(), &mut rtv);
+        let rtv = mcom::Rc::from_raw_opt(rtv);
         rtv.ok_or(Error::new_hr("ID3D11Device::CreateRenderTargetView", hr, "ID3D11RenderTargetView is null"))
     }
 

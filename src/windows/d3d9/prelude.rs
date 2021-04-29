@@ -54,7 +54,7 @@ pub trait IDirect3DDevice9Ext {
     unsafe fn create_vertex_buffer_from<V: Vertex>(&self, usage: DWORD, pool: D3DPOOL, data: &[V], _debug_name: &str) -> Result<mcom::Rc<IDirect3DVertexBuffer9>, Error>;
 
     /// [`IDirect3DDevice9::CreateVertexDeclaration`](https://docs.microsoft.com/en-us/windows/win32/api/d3d9/nf-d3d9-idirect3ddevice9-createvertexdeclaration)
-    fn create_vertex_decl_from<V: Vertex>(&self) -> Result<mcom::Rc<IDirect3DVertexDeclaration9>, Error>;
+    unsafe fn create_vertex_decl_from<V: Vertex>(&self) -> Result<mcom::Rc<IDirect3DVertexDeclaration9>, Error>;
 
     /// [`IDirect3DDevice9::CreateVertexBuffer`](https://docs.microsoft.com/en-us/windows/win32/api/d3d9/nf-d3d9-idirect3ddevice9-createvertexbuffer)
     /// + `Lock` + `memcpy` + `Unlock`
@@ -117,7 +117,7 @@ pub trait IDirect3DResource9Ext {
 
 
 
-impl IDirect3DDevice9Ext for mcom::Rc<IDirect3DDevice9> {
+impl IDirect3DDevice9Ext for IDirect3DDevice9 {
     unsafe fn get_back_buffer(&self, swap_chain: u32, back_buffer: u32) -> Result<mcom::Rc<IDirect3DSurface9>, Error> {
         let mut bb = null_mut();
         let hr = self.GetBackBuffer(swap_chain, back_buffer, D3DBACKBUFFER_TYPE_MONO, &mut bb);
@@ -168,7 +168,7 @@ impl IDirect3DDevice9Ext for mcom::Rc<IDirect3DDevice9> {
         Ok(vb)
     }
 
-    fn create_vertex_decl_from<V: Vertex>(&self) -> Result<mcom::Rc<IDirect3DVertexDeclaration9>, Error> {
+    unsafe fn create_vertex_decl_from<V: Vertex>(&self) -> Result<mcom::Rc<IDirect3DVertexDeclaration9>, Error> {
         let elements = V::elements();
         let elements = elements.as_ref();
         if elements.is_empty() { return Err(Error::new("mcom::Rc<IDirect3DDevice9>::create_vertex_decl_from", "", 0, "elements is empty")) }
@@ -186,12 +186,12 @@ impl IDirect3DDevice9Ext for mcom::Rc<IDirect3DDevice9> {
         }
 
         let mut vd = null_mut();
-        let hr = unsafe { self.CreateVertexDeclaration(elements.as_ptr(), &mut vd) };
-        unsafe { mcom::Rc::from_raw_opt(vd) }.ok_or(Error::new_hr("IDirect3DDevice9::CreateVertexDeclaration", hr, "IDirect3DVertexDeclaration9 is null"))
+        let hr = self.CreateVertexDeclaration(elements.as_ptr(), &mut vd);
+        mcom::Rc::from_raw_opt(vd).ok_or(Error::new_hr("IDirect3DDevice9::CreateVertexDeclaration", hr, "IDirect3DVertexDeclaration9 is null"))
     }
 }
 
-impl IDirect3DSwapChain9Ext for mcom::Rc<IDirect3DSwapChain9> {
+impl IDirect3DSwapChain9Ext for IDirect3DSwapChain9 {
     unsafe fn get_back_buffer(&self, back_buffer: u32) -> Result<mcom::Rc<IDirect3DSurface9>, Error> {
         let mut bb = null_mut();
         let hr = self.GetBackBuffer(back_buffer, D3DBACKBUFFER_TYPE_MONO, &mut bb);
