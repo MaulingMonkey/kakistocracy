@@ -77,3 +77,6 @@ features = [
     "unknwnbase",
     "winuser",
 ]
+
+[profile.release]
+debug = true
