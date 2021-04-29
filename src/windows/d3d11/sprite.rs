@@ -18,13 +18,10 @@ use std::ptr::*;
 
 
 
-/// Render `instances` of `texture` to `context`
-///
-/// ### Safety
-/// * `context`'s render target 0 is expected to be valid/bound
-/// * `context`'s viewport 0 is expected to be valid/bound
-pub unsafe fn draw(context: &mcom::Rc<ID3D11DeviceContext>, texture: &StaticFile, instances: &[Instance]) {
-    SpriteRenderer::new(context).draw(texture, instances)
+impl private::RenderTarget for &mcom::Rc<ID3D11DeviceContext> {
+    unsafe fn render1(&mut self, texture: &StaticFile, instances: &[Instance]) {
+        SpriteRenderer::new(self).draw(texture, instances)
+    }
 }
 
 

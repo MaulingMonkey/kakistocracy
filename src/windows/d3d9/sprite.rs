@@ -17,13 +17,10 @@ use std::ptr::*;
 
 
 
-/// Render `instances` of `texture` to `device`
-///
-/// ### Safety
-/// * `device`'s render target 0 is expected to be valid/bound
-/// * `device`'s viewport is expected to be valid/bound
-pub unsafe fn draw(device: &mcom::Rc<IDirect3DDevice9>, texture: &StaticFile, instances: &[Instance]) {
-    SpriteRenderer::new(device).draw(texture, instances)
+impl private::RenderTarget for &mcom::Rc<IDirect3DDevice9> {
+    unsafe fn render1(&mut self, texture: &StaticFile, instances: &[Instance]) {
+        SpriteRenderer::new(self).draw(texture, instances)
+    }
 }
 
 

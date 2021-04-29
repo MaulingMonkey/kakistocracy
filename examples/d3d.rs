@@ -5,7 +5,6 @@
 #[cfg(windows)] fn main() {
     use kakistocracy::*;
     use kakistocracy::windows::*;
-    use kakistocracy::windows::d3d9::sprite;
     use kakistocracy::windows::winapi::shared::d3d9types::*;
     use kakistocracy::windows::winapi::shared::minwindef::*;
     use kakistocracy::windows::winapi::shared::windef::*;
@@ -55,7 +54,7 @@
             ctx.bind().unwrap();
             let _hr = unsafe { dev.Clear(0, null(), D3DCLEAR_TARGET, 0xFF112233, 0.0, 0) };
             let _hr = unsafe { dev.BeginScene() };
-            unsafe { d3d9::sprite::draw(dev, &include_file!("d3d-16x9.png"), instances.as_ref()) };
+            unsafe { sprite::render1(dev, &include_file!("d3d-16x9.png"), instances.as_ref()) };
             let _hr = unsafe { dev.EndScene() };
             let _hr = unsafe { ctx.swap_chain.Present(null(), null(), null_mut(), null(), 0) };
             // XXX: error checking?
@@ -70,7 +69,7 @@
 
             unsafe { args.bind(ctx) }.unwrap();
             unsafe { ctx.ClearRenderTargetView(args.rtv.as_ptr(), &[0.3, 0.2, 0.1, 1.0]) };
-            unsafe { d3d11::sprite::draw(ctx, &include_file!("d3d-16x9.png"), instances.as_ref()) };
+            unsafe { sprite::render1(ctx, &include_file!("d3d-16x9.png"), instances.as_ref()) };
             unsafe { args.swap_chain.Present(1, 0) };
         }
     }

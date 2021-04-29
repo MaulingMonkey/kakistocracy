@@ -1,14 +1,24 @@
 //! [Sprite](https://en.wikipedia.org/wiki/Sprite_(computer_graphics)) rendering types/traits/functions
-//!
-//! ### See Also
-//! *   [crate::windows::d3d9::sprite]
-//! *   [crate::windows::d3d11::sprite]
 
 #![cfg_attr(not(all(windows, any(feature = "d3d9", feature = "d3d11"))), allow(dead_code))]
+
+use crate::io::StaticFile;
 
 use std::ops::*;
 
 
+
+/// Render `instances` of `texture` to `target`
+///
+/// ### Safety
+/// * `target` is expected to be "valid"
+///     * render target 0 is expected to be valid/bound
+///     * viewport is expected to be valid/bound
+pub unsafe fn render1<RT: RenderTarget>(mut target: RT, texture: &StaticFile, instances: &[Instance]) {
+    target.begin();
+    target.render1(texture, instances);
+    target.end();
+}
 
 /// A sprite instance
 #[repr(C)]
@@ -27,6 +37,12 @@ pub struct Instance {
     /// The UV coordinates to render the sprite with.
     pub texcoords:  [Range<f32>; 2],
 }
+
+/// [`IDirect3DDevice9`](winapi::shared::d3d9::IDirect3DDevice9) /
+/// [`ID3D11DeviceContext`](winapi::um::d3d11::ID3D11DeviceContext):
+/// targets sprites can be rendered to
+pub trait RenderTarget : private::RenderTarget {}
+impl<T: private::RenderTarget> RenderTarget for T {}
 
 
 
@@ -54,4 +70,14 @@ pub(crate) fn create_quads_index_data<I>(quads: I) -> Vec<I> where
         indicies.push(I::from(4) * quad + I::from(3));
     }
     indicies
+}
+
+pub(crate) mod private {
+    use super::*;
+
+    pub trait RenderTarget {
+        unsafe fn begin(&mut self) {}
+        unsafe fn render1(&mut self, texture: &StaticFile, instances: &[Instance]);
+        unsafe fn end(&mut self) {}
+    }
 }
