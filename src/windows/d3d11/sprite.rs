@@ -8,6 +8,7 @@ use crate::windows::*;
 use crate::windows::d3d11::{BasicTextureCache, Vertex};
 
 use winapi::shared::dxgiformat::*;
+use winapi::shared::winerror::*;
 use winapi::shared::minwindef::UINT;
 use winapi::um::d3d11::*;
 use winapi::um::d3dcommon::*;
@@ -100,7 +101,13 @@ impl<'d> SpriteRenderer<'d> {
                         verts.push(sprite::Vertex { position: [nx, ny, az, 1.0], texcoord: [u,v] });
                     }
                 }
-                self.device.create_buffer_from(D3D11_USAGE_IMMUTABLE, D3D11_BIND_VERTEX_BUFFER, &verts[..], "kakistocracy::windows::d3d11::sprite::SpriteRenderer::draw").unwrap()
+                match self.device.create_buffer_from(D3D11_USAGE_IMMUTABLE, D3D11_BIND_VERTEX_BUFFER, &verts[..], "kakistocracy::windows::d3d11::sprite::SpriteRenderer::draw") {
+                    Ok(buffer) => buffer,
+                    Err(err) => match err.hresult() {
+                        DXGI_ERROR_DEVICE_REMOVED   => continue,
+                        _other                      => panic!("{}", err),
+                    }
+                }
             };
 
             let ninstances = instances.len() as UINT;
