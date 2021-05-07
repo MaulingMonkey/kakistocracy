@@ -43,8 +43,8 @@ impl<'d> SpriteRenderer<'d> {
         let mut n_viewports = 1;
         let mut viewport = std::mem::zeroed();
         context.RSGetViewports(&mut n_viewports, &mut viewport);
-        let vx = viewport.TopLeftX; // - 0.5;
-        let vy = viewport.TopLeftY; // - 0.5;
+        let vx = viewport.TopLeftX;
+        let vy = viewport.TopLeftY;
         let viewport = [
             vx .. (vx + viewport.Width ),
             vy .. (vy + viewport.Height),
