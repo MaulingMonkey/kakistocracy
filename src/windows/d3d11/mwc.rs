@@ -53,7 +53,7 @@ pub struct RenderArgs {
     pub window:             HWND,
     pub rtv:                mcom::Rc<ID3D11RenderTargetView>,
     pub swap_chain:         mcom::Rc<IDXGISwapChain>,
-    client_size:    (u32, u32),
+    client_size:            (u32, u32),
 }
 
 struct DeviceAndAssoc {
@@ -129,6 +129,10 @@ impl ThreadLocal {
         let windows = self.windows.borrow().iter().filter_map(|&hwnd|{
             if unsafe { IsWindowVisible(hwnd) == FALSE } { return None; }
             if unsafe { IsIconic(hwnd)        != FALSE } { return None; }
+            // XXX: Check IVirtualDesktopManager::IsWindowOnCurrentVirtualDesktop
+            // XXX: Check DwmGetWindowAttribute(hwnd, DWMWA_CLOAKED, ...)
+            // Ref: https://chromium.googlesource.com/external/webrtc/+/HEAD/modules/desktop_capture/win/window_capture_utils.cc
+
             let mut rect = unsafe { std::mem::zeroed() };
             unsafe { GetClientRect(hwnd, &mut rect) }; // XXX: Error check?
             let client_size = ((rect.right - rect.left) as u32, (rect.bottom - rect.top) as u32);
