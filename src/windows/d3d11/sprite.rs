@@ -57,7 +57,6 @@ impl<'d> SpriteRenderer<'d> {
         // Common state
 
         let texture = self.textures.get_texture_2d_static_file(texture);
-        let texture = self.device.create_shader_resource_view(texture.up_ref()).unwrap(); // XXX: Offload to BasicTextureCache?
 
         self.context.IASetIndexBuffer(self.resources.quads_ib.as_ptr(), DXGI_FORMAT_R16_UINT, 0);
         self.context.IASetInputLayout(self.resources.sprite_vertex_layout.as_ptr());

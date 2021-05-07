@@ -21,9 +21,9 @@ use std::time::SystemTime;
 pub(crate) struct BasicTextureCache {
     device:                 mcom::Rc<ID3D11Device>,
 
-    placeholder_2d_error:   mcom::Rc<ID3D11Texture2D>,
+    placeholder_2d_error:   mcom::Rc<ID3D11ShaderResourceView>,
     #[allow(dead_code)]
-    placeholder_2d_missing: mcom::Rc<ID3D11Texture2D>,
+    placeholder_2d_missing: mcom::Rc<ID3D11ShaderResourceView>,
 
     static_files:           RefCell<HashMap<StaticBytesRef,     Entry2D>>,
     #[allow(dead_code)]
@@ -37,6 +37,9 @@ impl BasicTextureCache {
     }
 
     pub fn new(device: mcom::Rc<ID3D11Device>) -> Self {
+        // XXX: CreateShaderResourceView can fail with DXGI_ERROR_DEVICE_REMOVED on TDR / device loss / hang.
+        // XXX: CreateTexture2D can probably fail too?
+        // XXX: This should probably have some kind of error handling.
         let placeholder_2d_error    = create_texture_rgba_1x1(&device, 0xFF00FFFF).unwrap();
         let placeholder_2d_missing  = create_texture_rgba_1x1(&device, 0xFF00FFFF).unwrap();
         Self {
@@ -48,7 +51,7 @@ impl BasicTextureCache {
         }
     }
 
-    pub fn get_texture_2d_static_file(&self, file: &StaticFile) -> mcom::Rc<ID3D11Texture2D> {
+    pub fn get_texture_2d_static_file(&self, file: &StaticFile) -> mcom::Rc<ID3D11ShaderResourceView> {
         let mut static_files = self.static_files.borrow_mut();
         let entry = static_files.entry(StaticBytesRef(file.data)).or_insert_with(||
             self.create_entry_2d_bytes_debug_name(file.data, file.path).unwrap_or_else(|err| Entry2D {
@@ -60,7 +63,7 @@ impl BasicTextureCache {
     }
 
     #[allow(dead_code)]
-    pub fn get_texture_2d_static_path(&self, path: &'static Path) -> mcom::Rc<ID3D11Texture2D> {
+    pub fn get_texture_2d_static_path(&self, path: &'static Path) -> mcom::Rc<ID3D11ShaderResourceView> {
         let mut dynamic_files = self.dynamic_files.borrow_mut();
         let entry = dynamic_files.entry(Cow::Borrowed(path)).or_insert_with(|| {
             let mut last_mod_time = SystemTime::UNIX_EPOCH;
@@ -146,7 +149,9 @@ impl BasicTextureCache {
         let tex = unsafe { mcom::Rc::from_raw(tex) };
         let _ = unsafe { tex.set_debug_name(_debug_name) };
 
-        Ok(Entry2D { texture: tex, error: None })
+        let srv = unsafe { self.device.create_shader_resource_view(tex.up_ref()) }?;
+
+        Ok(Entry2D { texture: srv, error: None })
     }
 }
 
@@ -159,7 +164,7 @@ impl From<mcom::Rc<ID3D11Device>> for BasicTextureCache {
 type BoxError = Box<dyn std::error::Error>;
 
 struct Entry2D {
-    pub texture:    mcom::Rc<ID3D11Texture2D>,
+    pub texture:    mcom::Rc<ID3D11ShaderResourceView>,
     pub error:      Option<BoxError>,
 }
 
@@ -169,7 +174,7 @@ struct Dynamic<C> {
     last_mod_time:  SystemTime,
 }
 
-fn create_texture_rgba_1x1(device: &mcom::Rc<ID3D11Device>, rgba: u32) -> Result<mcom::Rc<ID3D11Texture2D>, Error> {
+fn create_texture_rgba_1x1(device: &mcom::Rc<ID3D11Device>, rgba: u32) -> Result<mcom::Rc<ID3D11ShaderResourceView>, Error> {
     let [r,g,b,a] = rgba.to_le_bytes();
     let bgra = [b,g,r,a];
 
@@ -185,5 +190,7 @@ fn create_texture_rgba_1x1(device: &mcom::Rc<ID3D11Device>, rgba: u32) -> Result
     let tex = unsafe { mcom::Rc::from_raw(tex) };
     let _ = unsafe { tex.set_debug_name(&format!("create_texture_rgba_1x1(device, 0x{:08x})", rgba)) };
 
-    Ok(tex)
+    let srv = unsafe { device.create_shader_resource_view(tex.up_ref()) }?;
+
+    Ok(srv)
 }
