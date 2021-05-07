@@ -105,6 +105,7 @@ impl<'d> SpriteRenderer<'d> {
                     Ok(buffer) => buffer,
                     Err(err) => match err.hresult() {
                         DXGI_ERROR_DEVICE_REMOVED   => continue,
+                        DXGI_ERROR_DEVICE_RESET     => continue,
                         _other                      => panic!("{}", err),
                     }
                 }
