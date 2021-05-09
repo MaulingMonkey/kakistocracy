@@ -170,7 +170,11 @@ impl ThreadLocal {
                             Flags:          DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH,
                         };
                         let _hr = unsafe { dxgi_factory.CreateSwapChain(dac.device.as_iunknown_ptr(), &mut desc, &mut swap_chain) };
-                        assert!(SUCCEEDED(_hr), "IDXGIFactory::CreateSwapChain failed with HRESULT == 0x{:08x}", _hr as u32);
+                        match _hr {
+                            DXGI_ERROR_DEVICE_REMOVED   => return None,
+                            DXGI_ERROR_DEVICE_RESET     => return None,
+                            _other                      => assert!(SUCCEEDED(_hr), "IDXGIFactory::CreateSwapChain failed with HRESULT == 0x{:08x}", _hr as u32),
+                        }
                         unsafe { mcom::Rc::from_raw_opt(swap_chain)? } // panic on null?
                     };
 
