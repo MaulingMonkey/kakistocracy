@@ -62,7 +62,7 @@
     }
 
     impl kakistocracy::windows::d3d11::Render for Context {
-        fn render(&self, args: &d3d11::RenderArgs) {
+        fn render(&self, args: &d3d11::RenderArgs) -> d3d11::RenderResult {
             let instances = self.sprite_instances(args.client_size());
 
             let ctx = &args.immediate_context;
@@ -70,7 +70,7 @@
             unsafe { args.bind(ctx) }.unwrap();
             unsafe { ctx.ClearRenderTargetView(args.rtv.as_ptr(), &[0.3, 0.2, 0.1, 1.0]) };
             unsafe { sprite::render1(ctx, &include_file!("d3d-16x9.png"), instances.as_ref()) };
-            unsafe { args.swap_chain.Present(1, 0) };
+            unsafe { args.swap_chain.Present(1, 0) }.into()
         }
     }
 

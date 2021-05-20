@@ -20,7 +20,7 @@ use std::ptr::null_mut;
 
 
 pub trait Render {
-    fn render(&self, args: &RenderArgs);
+    fn render(&self, args: &RenderArgs) -> RenderResult;
 }
 
 trait Context : Render + message::Handler + 'static {}
@@ -55,6 +55,12 @@ pub struct RenderArgs {
     pub swap_chain:         mcom::Rc<IDXGISwapChain>,
     client_size:            (u32, u32),
 }
+
+pub struct RenderResult(Option<Error>);
+impl    From<()>                  for RenderResult { fn from(_value: ()             ) -> Self { Self(None) } }
+impl    From<HRESULT>             for RenderResult { fn from(value: HRESULT         ) -> Self { Self(if SUCCEEDED(value) { None } else { Some(Error::new_hr("", value, "")) }) } }
+impl    From<Error>               for RenderResult { fn from(value: Error           ) -> Self { Self(Some(value)) } }
+impl<T> From<Result<T, Error>>    for RenderResult { fn from(value: Result<T, Error>) -> Self { Self(value.err()) } }
 
 struct DeviceAndAssoc {
     // NOTE: drop order might be important here!
@@ -202,9 +208,32 @@ impl ThreadLocal {
         if let Some(lock) = self.lock(false) {
             for window in lock.windows.iter() {
                 if let Ok(assoc) = hwnd::assoc::get::<WindowAssoc>(window.window) {
-                    assoc.context.render(&window);
+                    if let Some(err) = assoc.context.render(&window).0 {
+                        match err.hresult() {
+                            // https://docs.microsoft.com/en-us/windows/win32/direct3ddxgi/dxgi-error
+                            DXGI_ERROR_DEVICE_HUNG              => self.reset_device(Some(err)),
+                            DXGI_ERROR_DEVICE_REMOVED           => self.reset_device(None),
+                            DXGI_ERROR_DEVICE_RESET             => self.reset_device(None),
+                            DXGI_ERROR_DRIVER_INTERNAL_ERROR    => self.reset_device(Some(err)),
+                            hr if SUCCEEDED(hr) => {},
+                            _hr => panic!("d3d11::Render::render: {}", err),
+                        }
+                    }
                 }
             }
+        }
+    }
+
+    fn reset_device(&self, bug: Option<Error>) {
+        for window in self.windows.borrow().iter().copied() {
+            if let Ok(wa) = hwnd::assoc::get::<WindowAssoc>(window) {
+                *wa.swap_chain_rtv.borrow_mut() = None;
+            }
+        }
+        *self.dac.borrow_mut() = None;
+
+        if let Some(bug) = bug {
+            panic!("d3d11::Render::render: {}", bug);
         }
     }
 }
